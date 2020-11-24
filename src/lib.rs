@@ -60,6 +60,35 @@ impl Game {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn board(&self) -> &ChessBoard {
+        &self.board
+    }
+
+    pub fn white_king(&self) -> ChessIndex {
+        self.white_king
+    }
+
+    pub fn black_king(&self) -> ChessIndex {
+        self.black_king
+    }
+
+    pub fn white_taken(&self) -> &Vec<Piece> {
+        &self.white_taken
+    }
+
+    pub fn black_taken(&self) -> &Vec<Piece> {
+        &self.black_taken
+    }
+
+    pub fn board_history(&self) -> &Vec<ChessBoard> {
+        &self.history
+    }
+
+    pub fn move_history(&self) -> &Vec<ChessMove> {
+        &self.move_history
+    }
+
     /// Check if a square is in check
     pub fn is_checked(&self, index: ChessIndex, color: Color) -> bool {
         if let Some(_knight_idx) = self.is_checked_by_knight(index, color) {
