@@ -203,21 +203,7 @@ impl Game {
         king_index: ChessIndex,
         king_color: Color,
     ) -> Option<ChessIndex> {
-        const KNIGHT_OFFSETS: [(i32, i32); 8] = [
-            (2, 1),
-            (2, -1),
-            (-2, 1),
-            (-2, -1),
-            (1, 2),
-            (1, -2),
-            (-1, 2),
-            (-1, -2),
-        ];
-
-        for knight_index in KNIGHT_OFFSETS
-            .iter()
-            .filter_map(|&(file_offset, rank_offset)| king_index.step(file_offset, rank_offset))
-        {
+        for knight_index in king_index.knight_moves() {
             if self
                 .board()
                 .piece_at(knight_index)
@@ -838,7 +824,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rook_moves() {
+    fn rook_moves() {
         let mut game = Game::new();
         game.execute_regular_move(RegularMove::new(A1, E4));
 
@@ -863,7 +849,7 @@ mod tests {
     }
 
     #[test]
-    fn test_knight_moves() {
+    fn knight_moves() {
         let mut game = Game::new();
 
         game.execute_regular_move((G1, E4));
@@ -884,7 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bishop_moves() {
+    fn bishop_moves() {
         let mut game = Game::new();
 
         game.execute_regular_move((F1, F4));
@@ -906,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn test_queen_moves() {
+    fn queen_moves() {
         let mut game = Game::new();
         game.execute_regular_move((D1, D4));
 
@@ -939,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    fn test_king_moves() {
+    fn king_moves() {
         let mut game = Game::new();
 
         print_board("initial", &game);
@@ -981,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_checked_by_pawn() {
+    fn is_checked_by_pawn() {
         let mut game = Game::new();
 
         game.execute_regular_move((E1, E4));
@@ -998,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_checked_by_knight() {
+    fn is_checked_by_knight() {
         let mut game = Game::new();
 
         game.execute_regular_move((E1, E4));
@@ -1015,7 +1001,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_checked_by_bishop() {
+    fn is_checked_by_bishop() {
         let mut game = Game::new();
 
         game.execute_regular_move((E1, E4));
@@ -1038,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_checked_by_rook() {
+    fn is_checked_by_rook() {
         let mut game = Game::new();
 
         game.execute_regular_move((E1, E4));
@@ -1061,7 +1047,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_checked_by_queen() {
+    fn is_checked_by_queen() {
         let mut game = Game::new();
 
         game.execute_regular_move((E1, E4));
@@ -1090,7 +1076,7 @@ mod tests {
     }
 
     #[test]
-    fn test_can_castle() {
+    fn can_castle() {
         let mut game = Game::new();
 
         assert_eq!(game.can_castle(E1, H1), Err(CanCastleError::PiecesBetween)); // can't castle because there are pieces between
@@ -1127,7 +1113,7 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_castle_move() {
+    fn execute_castle_move() {
         let mut game = Game::new();
 
         print_board("initial", &game);
@@ -1155,7 +1141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_moves_to_opponents_piece() {
+    fn moves_to_opponents_piece() {
         let mut game = Game::new();
 
         game.execute_regular_move((D1, E5));
@@ -1223,7 +1209,7 @@ mod tests {
     }
 
     #[test]
-    fn test_valid_pawn_moves_from() {
+    fn valid_pawn_moves_from() {
         let mut game = Game::new();
 
         print_board("initial", &game);
@@ -1266,7 +1252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pawn_promotion() {
+    fn pawn_promotion() {
         let mut game = Game::new();
 
         print_board("initial", &game);
@@ -1296,7 +1282,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pawn_promotion_2() {
+    fn pawn_promotion_2() {
         let mut game = Game::new();
 
         game.board = ChessBoard::default();
@@ -1327,7 +1313,7 @@ mod tests {
     }
 
     #[test]
-    fn test_en_passant() {
+    fn en_passant() {
         let mut game = Game::new();
 
         print_board("initial", &game);
@@ -1354,7 +1340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_can_en_passant() {
+    fn can_en_passant() {
         let mut game = Game::new();
 
         let white_pawn = game.board.take_piece(E2).unwrap();
@@ -1376,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_undo_last_move() {
+    fn undo_last_move() {
         let mut game = Game::new();
 
         print_board("initial", &game);

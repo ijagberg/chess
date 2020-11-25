@@ -153,7 +153,7 @@ mod tests {
     use crate::Color::*;
 
     #[test]
-    fn test_set_piece() {
+    fn set_piece() {
         let mut board = ChessBoard::default();
 
         assert!(board.piece_at(E4).is_none());
@@ -167,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn test_take_piece() {
+    fn take_piece() {
         let mut board = ChessBoard::default();
 
         assert!(board.take_piece(E2).is_none());

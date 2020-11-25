@@ -187,7 +187,7 @@ mod tests {
     use crate::consts::*;
 
     #[test]
-    fn test_from_str() {
+    fn from_str() {
         assert_eq!(ChessIndex::from_str("A1").unwrap(), A1);
         assert_eq!(ChessIndex::from_str("H5").unwrap(), H5);
         assert_eq!(
@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_indices_between() {
+    fn indices_between() {
         assert_eq!(ChessIndex::indices_between(E4, E7), vec![E4, E5, E6, E7]);
         assert_eq!(ChessIndex::indices_between(E7, E4), vec![E7, E6, E5, E4]);
         assert_eq!(ChessIndex::indices_between(E4, F3), vec![]);
@@ -214,5 +214,25 @@ mod tests {
             ChessIndex::indices_between(E1, A1),
             vec![E1, D1, C1, B1, A1]
         );
+    }
+
+    #[test]
+    fn knight_moves() {
+        assert_eq!(E4.knight_moves(), vec![G5, G3, C5, C3, F6, F2, D6, D2]);
+        assert_eq!(H4.knight_moves(), vec![F5, F3, G6, G2]);
+        assert_eq!(A1.knight_moves(), vec![C2, B3]);
+    }
+
+    #[test]
+    fn neighbors() {
+        assert_eq!(D5.neighbors(), vec![E6, E4, C6, C4, E5, C5, D6, D4]);
+        assert_eq!(C1.neighbors(), vec![D2, B2, D1, B1, C2]);
+        assert_eq!(A1.neighbors(), vec![B2, B1, A2]);
+    }
+
+    #[test]
+    fn step() {
+        assert_eq!(A1.step(1, 3), Some(B4));
+        assert_eq!(A1.step(10, 2), None);
     }
 }

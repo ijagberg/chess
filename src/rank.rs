@@ -237,7 +237,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rank_iter() {
+    fn rank_iter() {
         assert_eq!(
             RankIter::start_at(Rank::First).collect::<Vec<_>>(),
             vec![
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_i32() {
+    fn add_i32() {
         assert_eq!(Rank::Third + (-1_i32), Some(Rank::Second));
         assert_eq!(Rank::Third + (-2_i32), Some(Rank::First));
         assert_eq!(Rank::Third + (-3_i32), None);

@@ -213,7 +213,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_file_iter() {
+    fn file_iter() {
         assert_eq!(
             FileIter::start_at(File::A).collect::<Vec<_>>(),
             vec![
@@ -240,14 +240,14 @@ mod tests {
     }
 
     #[test]
-    fn test_add() {
+    fn add() {
         assert_eq!(File::A + 1, Some(File::B));
         assert_eq!(File::A + 2, Some(File::C));
         assert_eq!(File::A + 10, None);
     }
 
     #[test]
-    fn test_sub() {
+    fn sub() {
         assert_eq!(File::A - 1, None);
         assert_eq!(File::B - 1, Some(File::A));
     }
