@@ -190,7 +190,7 @@ impl RankIter {
     ///
     /// # Example
     /// ```
-    /// use game::{Rank, RankIter};
+    /// # use chess::{Rank, RankIter};
     ///
     /// let mut rank_iter = RankIter::start_at(Rank::First);
     /// assert_eq!(rank_iter.next(), Some(Rank::First));

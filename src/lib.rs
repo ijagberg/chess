@@ -99,15 +99,11 @@ impl Game {
             return true;
         }
 
-        if let Some(_bishop_idx) = self.is_checked_by_bishop(index, color) {
+        if let Some(_vert_hori_idx) = self.is_checked_vertical_horizontal(index, color) {
             return true;
         }
 
-        if let Some(_rook_idx) = self.is_checked_by_rook(index, color) {
-            return true;
-        }
-
-        if let Some(_queen_idx) = self.is_checked_by_queen(index, color) {
+        if let Some(_diag_idx) = self.is_checked_diagonal(index, color) {
             return true;
         }
 
@@ -121,75 +117,38 @@ impl Game {
         }
     }
 
-    fn is_checked_by_bishop(
+    fn is_checked_vertical_horizontal(
         &self,
         king_index: ChessIndex,
         king_color: Color,
     ) -> Option<ChessIndex> {
-        let opponent_color = king_color.opponent();
+        const HORI_VERT_OFFSETS: [(i32, i32); 4] = [(0, 1), (0, -1), (1, 0), (-1, 0)];
 
-        // increasing file, increasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .zip(RankIter::start_at(king_index.rank()))
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_bishop() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
+        for &(file_offset, rank_offset) in &HORI_VERT_OFFSETS {
+            if let Some(p) =
+                self.find_opponent_piece_along(king_index, file_offset, rank_offset, king_color)
+            {
+                if p.is_rook() || p.is_queen() || p.is_king() {
+                    return Some(*p.history().last().unwrap());
                 }
             }
         }
 
-        // increasing file, decreasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .zip(RankIter::start_at(king_index.rank()).rev())
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_bishop() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
+        None
+    }
+
+    fn is_checked_diagonal(&self, king_index: ChessIndex, king_color: Color) -> Option<ChessIndex> {
+        const DIAGONAL_OFFSETS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
+
+        for &(file_offset, rank_offset) in &DIAGONAL_OFFSETS {
+            if let Some(p) =
+                self.find_opponent_piece_along(king_index, file_offset, rank_offset, king_color)
+            {
+                if p.is_bishop() || p.is_queen() || p.is_king() {
+                    return Some(*p.history().last().unwrap());
                 }
             }
         }
-
-        // decreasing file, increasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .zip(RankIter::start_at(king_index.rank()))
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_bishop() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing file, decreasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .zip(RankIter::start_at(king_index.rank()).rev())
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_bishop() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
         None
     }
 
@@ -244,9 +203,7 @@ impl Game {
         king_index: ChessIndex,
         king_color: Color,
     ) -> Option<ChessIndex> {
-        let opponent_color = king_color.opponent();
-        // check if there is an opponent knight a knight's move away
-        let offsets = vec![
+        const KNIGHT_OFFSETS: [(i32, i32); 8] = [
             (2, 1),
             (2, -1),
             (-2, 1),
@@ -257,212 +214,33 @@ impl Game {
             (-1, -2),
         ];
 
-        for (file_offset, rank_offset) in offsets {
-            if let Ok(to_index) = ChessIndex::try_from((
-                u8::from(&king_index.file()) as i32 + file_offset,
-                u8::from(&king_index.rank()) as i32 + rank_offset,
-            )) {
-                if self.board[to_index]
-                    .piece()
-                    .map(|p| p.is_knight() && p.color() == opponent_color)
-                    .unwrap_or(false)
-                {
-                    return Some(to_index);
-                }
+        for knight_index in KNIGHT_OFFSETS
+            .iter()
+            .filter_map(|&(file_offset, rank_offset)| king_index.step(file_offset, rank_offset))
+        {
+            if self
+                .board()
+                .piece_at(knight_index)
+                .map(|p| p.is_knight() && p.color() == king_color.opponent())
+                .unwrap_or(false)
+            {
+                return Some(knight_index);
             }
         }
-
         None
     }
 
-    fn is_checked_by_rook(&self, king_index: ChessIndex, king_color: Color) -> Option<ChessIndex> {
-        let opponent_color = king_color.opponent();
-
-        // increasing file
-        for idx in FileIter::start_at(king_index.file())
-            .map(|file| ChessIndex::new(file, king_index.rank()))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_rook() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing file
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .map(|file| ChessIndex::new(file, king_index.rank()))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_rook() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // increasing rank
-        for idx in RankIter::start_at(king_index.rank())
-            .map(|rank| ChessIndex::new(king_index.file(), rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_rook() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing rank
-        for idx in RankIter::start_at(king_index.rank())
-            .rev()
-            .map(|rank| ChessIndex::new(king_index.file(), rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_rook() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        None
-    }
-
-    fn is_checked_by_queen(&self, king_index: ChessIndex, king_color: Color) -> Option<ChessIndex> {
-        let opponent_color = king_color.opponent();
-
-        // increasing file
-        for idx in FileIter::start_at(king_index.file())
-            .map(|file| ChessIndex::new(file, king_index.rank()))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing file
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .map(|file| ChessIndex::new(file, king_index.rank()))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // increasing rank
-        for idx in RankIter::start_at(king_index.rank())
-            .map(|rank| ChessIndex::new(king_index.file(), rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing rank
-        for idx in RankIter::start_at(king_index.rank())
-            .rev()
-            .map(|rank| ChessIndex::new(king_index.file(), rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // increasing file, increasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .zip(RankIter::start_at(king_index.rank()))
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // increasing file, decreasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .zip(RankIter::start_at(king_index.rank()).rev())
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing file, increasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .zip(RankIter::start_at(king_index.rank()))
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        // decreasing file, decreasing rank
-        for idx in FileIter::start_at(king_index.file())
-            .rev()
-            .zip(RankIter::start_at(king_index.rank()).rev())
-            .map(|(file, rank)| ChessIndex::new(file, rank))
-            .skip(1)
-        {
-            if let Some(p) = self.board[idx].piece() {
-                if p.is_queen() && p.color() == opponent_color {
-                    return Some(idx);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        None
+    fn find_opponent_piece_along(
+        &self,
+        start: ChessIndex,
+        file_step: i32,
+        rank_step: i32,
+        our_color: Color,
+    ) -> Option<&Piece> {
+        self.moves_to_opponents_piece(start, file_step, rank_step, our_color)
+            .last()
+            .map(|m| self.board.piece_at(m.to_idx()))
+            .unwrap_or(None)
     }
 
     fn undo_last_move(&mut self) {
@@ -510,8 +288,9 @@ impl Game {
             Color::Black => -1_i32,
             Color::White => 1_i32,
         };
-        let forward_rank: Rank = match pawn_idx.rank() + forward_offset {
-            Some(rank) => rank,
+
+        let forward_idx = match pawn_idx.rank() + forward_offset {
+            Some(rank) => ChessIndex::new(pawn_idx.file(), rank),
             None => {
                 // we are at the end of the board,
                 // this should not happen i think?
@@ -519,8 +298,6 @@ impl Game {
                 return moves;
             }
         };
-
-        let forward_idx = ChessIndex::new(pawn_idx.file(), forward_rank);
 
         let diagonals: Vec<ChessIndex> = vec![forward_idx.file() - 1, forward_idx.file() + 1]
             .into_iter()
@@ -628,91 +405,10 @@ impl Game {
     fn valid_king_moves_from(&self, from_index: ChessIndex, piece_color: Color) -> Vec<ChessMove> {
         let mut moves: Vec<ChessMove> = Vec::new();
 
-        // increasing file
-        if let Some(file) = from_index.file() + 1 {
-            let to_index = ChessIndex::new(file, from_index.rank());
-            match self.board[to_index].piece() {
+        for idx in from_index.neighbors() {
+            match self.board().piece_at(idx) {
                 Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // decreasing file
-        if let Some(file) = from_index.file() - 1 {
-            let to_index = ChessIndex::new(file, from_index.rank());
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // increasing rank
-        if let Some(rank) = from_index.rank() + 1 {
-            let to_index = ChessIndex::new(from_index.file(), rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // decreasing rank
-        if let Some(rank) = from_index.rank() - 1 {
-            let to_index = ChessIndex::new(from_index.file(), rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // increasing file, increasing rank
-        if let (Some(file), Some(rank)) = (from_index.file() + 1, from_index.rank() + 1) {
-            let to_index = ChessIndex::new(file, rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // increasing file, decreasing rank
-        if let (Some(file), Some(rank)) = (from_index.file() + 1, from_index.rank() - 1) {
-            let to_index = ChessIndex::new(file, rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // decreasing file, increasing rank
-        if let (Some(file), Some(rank)) = (from_index.file() - 1, from_index.rank() + 1) {
-            let to_index = ChessIndex::new(file, rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
-            }
-        }
-
-        // decreasing file, decreasing rank
-        if let (Some(file), Some(rank)) = (from_index.file() - 1, from_index.rank() - 1) {
-            let to_index = ChessIndex::new(file, rank);
-            match self.board[to_index].piece() {
-                Some(p) if p.color() == piece_color => {}
-                _ => {
-                    moves.push(ChessMove::regular(from_index, to_index));
-                }
+                _ => moves.push(ChessMove::regular(from_index, idx)),
             }
         }
 
@@ -734,7 +430,7 @@ impl Game {
         // decreasing file
         moves.append(&mut self.moves_to_opponents_piece(from_index, -1, 0, piece_color));
 
-        moves
+        moves.into_iter().map(|rm| ChessMove::Regular(rm)).collect()
     }
 
     fn valid_knight_moves_from(
@@ -744,27 +440,11 @@ impl Game {
     ) -> Vec<ChessMove> {
         let mut moves = Vec::new();
 
-        let offsets = vec![
-            (2, 1),
-            (2, -1),
-            (-2, 1),
-            (-2, -1),
-            (1, 2),
-            (1, -2),
-            (-1, 2),
-            (-1, -2),
-        ];
-
-        for (file_offset, rank_offset) in offsets {
-            if let Ok(to_index) = ChessIndex::try_from((
-                u8::from(&from_index.file()) as i32 + file_offset,
-                u8::from(&from_index.rank()) as i32 + rank_offset,
-            )) {
-                match self.board[to_index].piece() {
-                    Some(p) if p.color() == piece_color => {}
-                    _ => {
-                        moves.push(ChessMove::regular(from_index, to_index));
-                    }
+        for to_index in from_index.knight_moves() {
+            match self.board[to_index].piece() {
+                Some(p) if p.color() == piece_color => {}
+                _ => {
+                    moves.push(ChessMove::regular(from_index, to_index));
                 }
             }
         }
@@ -790,7 +470,7 @@ impl Game {
         // decreasing file, decreasing rank
         moves.append(&mut self.moves_to_opponents_piece(from_index, -1, -1, piece_color));
 
-        moves
+        moves.into_iter().map(|rm| ChessMove::Regular(rm)).collect()
     }
 
     fn valid_queen_moves_from(&self, from_index: ChessIndex, piece_color: Color) -> Vec<ChessMove> {
@@ -997,7 +677,7 @@ impl Game {
         file_step: i32,
         rank_step: i32,
         color: Color,
-    ) -> Vec<ChessMove> {
+    ) -> Vec<RegularMove> {
         let mut moves = Vec::new();
         for idx in (0..)
             .map(|n| {
@@ -1018,12 +698,12 @@ impl Game {
             match self.board[idx].piece() {
                 Some(p) => {
                     if p.color() == color.opponent() {
-                        moves.push(ChessMove::regular(start, idx));
+                        moves.push(RegularMove::new(start, idx));
                     }
                     break;
                 }
                 None => {
-                    moves.push(ChessMove::regular(start, idx));
+                    moves.push(RegularMove::new(start, idx));
                 }
             }
         }
@@ -1264,39 +944,39 @@ mod tests {
 
         print_board("initial", &game);
 
-        assert_eq!(game.valid_king_moves_from(E1, White), vec![]);
+        compare_regular_moves(game.valid_king_moves_from(E1, White), vec![]);
 
         game.execute_regular_move((E1, E4));
 
         print_board("king on E4", &game);
 
-        assert_eq!(
+        compare_regular_moves(
             game.valid_king_moves_from(E4, White),
             vec![
+                ChessMove::regular(E4, F5),
+                ChessMove::regular(E4, F3),
+                ChessMove::regular(E4, D5),
+                ChessMove::regular(E4, D3),
                 ChessMove::regular(E4, F4),
                 ChessMove::regular(E4, D4),
                 ChessMove::regular(E4, E5),
                 ChessMove::regular(E4, E3),
-                ChessMove::regular(E4, F5),
-                ChessMove::regular(E4, F3),
-                ChessMove::regular(E4, D5),
-                ChessMove::regular(E4, D3),
-            ]
+            ],
         );
 
         game.execute_regular_move((F7, F6));
         print_board("-", &game);
-        assert_eq!(
+        compare_regular_moves(
             game.valid_moves_from(E4),
             vec![
-                ChessMove::regular(E4, F4),
-                ChessMove::regular(E4, D4),
-                ChessMove::regular(E4, E3),
                 ChessMove::regular(E4, F5),
                 ChessMove::regular(E4, F3),
                 ChessMove::regular(E4, D5),
                 ChessMove::regular(E4, D3),
-            ]
+                ChessMove::regular(E4, F4),
+                ChessMove::regular(E4, D4),
+                ChessMove::regular(E4, E3),
+            ],
         );
     }
 
@@ -1342,19 +1022,19 @@ mod tests {
 
         print_board("king on E4", &game);
 
-        assert_eq!(game.is_checked_by_bishop(E4, White), None);
+        assert_eq!(game.is_checked_diagonal(E4, White), None);
 
         game.execute_regular_move((C8, G6));
 
         print_board("bishop checking from G6", &game);
 
-        assert_eq!(game.is_checked_by_bishop(E4, White), Some(G6));
+        assert_eq!(game.is_checked_diagonal(E4, White), Some(G6));
 
         game.execute_regular_move((F2, F5));
 
         print_board("white bishop blocks the check", &game);
 
-        assert_eq!(game.is_checked_by_bishop(E4, White), None);
+        assert_eq!(game.is_checked_diagonal(E4, White), None);
     }
 
     #[test]
@@ -1365,19 +1045,19 @@ mod tests {
 
         print_board("king on E4", &game);
 
-        assert_eq!(game.is_checked_by_rook(E4, White), None);
+        assert_eq!(game.is_checked_vertical_horizontal(E4, White), None);
 
         game.execute_regular_move((H8, H4));
 
         print_board("rook checking from H4", &game);
 
-        assert_eq!(game.is_checked_by_rook(E4, White), Some(H4));
+        assert_eq!(game.is_checked_vertical_horizontal(E4, White), Some(H4));
 
         game.execute_regular_move((G2, G4));
 
         print_board("white pawn blocks the check", &game);
 
-        assert_eq!(game.is_checked_by_rook(E4, White), None);
+        assert_eq!(game.is_checked_vertical_horizontal(E4, White), None);
     }
 
     #[test]
@@ -1388,25 +1068,25 @@ mod tests {
 
         print_board("king on E4", &game);
 
-        assert_eq!(game.is_checked_by_queen(E4, White), None);
+        assert_eq!(game.is_checked(E4, White), false);
 
         game.execute_regular_move((D8, C6));
 
         print_board("queen checking from C6", &game);
 
-        assert_eq!(game.is_checked_by_queen(E4, White), Some(C6));
+        assert_eq!(game.is_checked_diagonal(E4, White), Some(C6));
 
         game.execute_regular_move((C6, B4));
 
         print_board("queen checking from B4", &game);
 
-        assert_eq!(game.is_checked_by_queen(E4, White), Some(B4));
+        assert_eq!(game.is_checked_vertical_horizontal(E4, White), Some(B4));
 
         game.execute_regular_move((C1, D4));
 
         print_board("white bishop blocking check", &game);
 
-        assert_eq!(game.is_checked_by_queen(E4, White), None);
+        assert_eq!(game.is_checked_vertical_horizontal(E4, White), None);
     }
 
     #[test]
@@ -1483,22 +1163,22 @@ mod tests {
         // increasing rank
         assert_eq!(
             game.moves_to_opponents_piece(E5, 0, 1, White),
-            vec![ChessMove::regular(E5, E6), ChessMove::regular(E5, E7),]
+            vec![RegularMove::new(E5, E6), RegularMove::new(E5, E7),]
         );
 
         // decreasing rank
         assert_eq!(
             game.moves_to_opponents_piece(E5, 0, -1, White),
-            vec![ChessMove::regular(E5, E4), ChessMove::regular(E5, E3),]
+            vec![RegularMove::new(E5, E4), RegularMove::new(E5, E3),]
         );
 
         // increasing file
         assert_eq!(
             game.moves_to_opponents_piece(E5, 1, 0, White),
             vec![
-                ChessMove::regular(E5, F5),
-                ChessMove::regular(E5, G5),
-                ChessMove::regular(E5, H5),
+                RegularMove::new(E5, F5),
+                RegularMove::new(E5, G5),
+                RegularMove::new(E5, H5),
             ]
         );
 
@@ -1506,10 +1186,10 @@ mod tests {
         assert_eq!(
             game.moves_to_opponents_piece(E5, -1, 0, White),
             vec![
-                ChessMove::regular(E5, D5),
-                ChessMove::regular(E5, C5),
-                ChessMove::regular(E5, B5),
-                ChessMove::regular(E5, A5),
+                RegularMove::new(E5, D5),
+                RegularMove::new(E5, C5),
+                RegularMove::new(E5, B5),
+                RegularMove::new(E5, A5),
             ]
         );
 
@@ -1517,28 +1197,28 @@ mod tests {
         // increasing rank, increasing file
         assert_eq!(
             game.moves_to_opponents_piece(E5, 1, 1, White),
-            vec![ChessMove::regular(E5, F6), ChessMove::regular(E5, G7),]
+            vec![RegularMove::new(E5, F6), RegularMove::new(E5, G7),]
         );
 
         // diagonal
         // increasing rank, decreasing file
         assert_eq!(
             game.moves_to_opponents_piece(E5, -1, 1, White),
-            vec![ChessMove::regular(E5, D6), ChessMove::regular(E5, C7),]
+            vec![RegularMove::new(E5, D6), RegularMove::new(E5, C7),]
         );
 
         // diagonal
         // decreasing rank, increasing file
         assert_eq!(
             game.moves_to_opponents_piece(E5, 1, -1, White),
-            vec![ChessMove::regular(E5, F4), ChessMove::regular(E5, G3),]
+            vec![RegularMove::new(E5, F4), RegularMove::new(E5, G3),]
         );
 
         // diagonal
         // decreasing rank, decreasing file
         assert_eq!(
             game.moves_to_opponents_piece(E5, -1, -1, White),
-            vec![ChessMove::regular(E5, D4), ChessMove::regular(E5, C3),]
+            vec![RegularMove::new(E5, D4), RegularMove::new(E5, C3),]
         );
     }
 
@@ -1715,6 +1395,13 @@ mod tests {
 
         assert_eq!(game.board[E5].piece(), None);
         assert!(game.board[E7].piece().is_some());
+    }
+
+    fn compare_regular_moves(actual: Vec<ChessMove>, expected: Vec<ChessMove>) {
+        assert_eq!(actual.len(), expected.len());
+        for (actual, expected) in actual.into_iter().zip(expected.into_iter()) {
+            assert_eq!(actual, expected);
+        }
     }
 
     fn print_board(title: &str, game: &Game) {

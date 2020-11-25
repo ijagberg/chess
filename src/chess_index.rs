@@ -22,6 +22,56 @@ impl ChessIndex {
         self.0
     }
 
+    pub fn step(&self, file_offset: i32, rank_offset: i32) -> Option<Self> {
+        if let (Some(file), Some(rank)) = (
+            File::try_from(i32::from(&self.file()) + file_offset).ok(),
+            Rank::try_from(i32::from(&self.rank()) + rank_offset).ok(),
+        ) {
+            Some(ChessIndex::new(file, rank))
+        } else {
+            None
+        }
+    }
+
+    pub fn diagonals(&self) -> Vec<Self> {
+        const DIAGONAL_OFFSETS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
+        DIAGONAL_OFFSETS
+            .iter()
+            .filter_map(|&(file_offset, rank_offset)| self.step(file_offset, rank_offset))
+            .collect()
+    }
+
+    pub fn cardinal_dirs(&self) -> Vec<Self> {
+        const CARDINAL_OFFSETS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+        CARDINAL_OFFSETS
+            .iter()
+            .filter_map(|&(file_offset, rank_offset)| self.step(file_offset, rank_offset))
+            .collect()
+    }
+
+    pub fn neighbors(&self) -> Vec<Self> {
+        let mut diags = self.diagonals();
+        diags.append(&mut self.cardinal_dirs());
+        diags
+    }
+
+    pub fn knight_moves(&self) -> Vec<Self> {
+        const KNIGHT_OFFSETS: [(i32, i32); 8] = [
+            (2, 1),
+            (2, -1),
+            (-2, 1),
+            (-2, -1),
+            (1, 2),
+            (1, -2),
+            (-1, 2),
+            (-1, -2),
+        ];
+        KNIGHT_OFFSETS
+            .iter()
+            .filter_map(|&(file_offset, rank_offset)| self.step(file_offset, rank_offset))
+            .collect()
+    }
+
     pub fn indices_between<T>(from: T, to: T) -> Vec<ChessIndex>
     where
         ChessIndex: From<T>,

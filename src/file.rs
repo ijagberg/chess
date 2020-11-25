@@ -166,7 +166,7 @@ impl FileIter {
     ///
     /// # Example
     /// ```
-    /// use game::{File, FileIter};
+    /// # use chess::{File, FileIter};
     ///
     /// let mut file_iter = FileIter::start_at(File::A);
     /// assert_eq!(file_iter.next(), Some(File::A));
