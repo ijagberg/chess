@@ -83,31 +83,31 @@ impl ChessIndex {
             let file = from.file();
             // iterate horizontally
             if from.rank() <= to.rank() {
-                return RankIter::start_at(from.rank())
+                RankIter::start_at(from.rank())
                     .take_while(|r| r <= &to.rank())
                     .map(|r| ChessIndex::new(file, r))
-                    .collect();
+                    .collect()
             } else {
-                return RankIter::start_at(from.rank())
+                RankIter::start_at(from.rank())
                     .rev()
                     .take_while(|r| r >= &to.rank())
                     .map(|r| ChessIndex::new(file, r))
-                    .collect();
+                    .collect()
             }
         } else if from.rank() == to.rank() {
             let rank = from.rank();
             // iterate vertically
             if from.file() <= to.file() {
-                return FileIter::start_at(from.file())
+                FileIter::start_at(from.file())
                     .take_while(|f| f <= &to.file())
                     .map(|f| ChessIndex::new(f, rank))
-                    .collect();
+                    .collect()
             } else {
-                return FileIter::start_at(from.file())
+                FileIter::start_at(from.file())
                     .rev()
                     .take_while(|f| f >= &to.file())
                     .map(|f| ChessIndex::new(f, rank))
-                    .collect();
+                    .collect()
             }
         } else {
             vec![]
@@ -168,7 +168,9 @@ pub enum ParseChessIndexError {
 impl Display for ParseChessIndexError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = match self {
-            ParseChessIndexError::LengthNot2 => format!("format should be 'xy', x: file, y: rank"),
+            ParseChessIndexError::LengthNot2 => {
+                "format should be 'xy', x: file, y: rank".to_string()
+            }
             ParseChessIndexError::InvalidFile(file) => format!("invalid file: '{}'", file),
             ParseChessIndexError::InvalidRank(rank) => format!("invalid rank: '{}'", rank),
         };

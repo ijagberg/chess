@@ -430,7 +430,7 @@ impl Game {
         // decreasing file
         moves.append(&mut self.moves_to_opponents_piece(from_index, -1, 0, piece_color));
 
-        moves.into_iter().map(|rm| ChessMove::Regular(rm)).collect()
+        moves.into_iter().map(ChessMove::Regular).collect()
     }
 
     fn valid_knight_moves_from(
@@ -470,7 +470,7 @@ impl Game {
         // decreasing file, decreasing rank
         moves.append(&mut self.moves_to_opponents_piece(from_index, -1, -1, piece_color));
 
-        moves.into_iter().map(|rm| ChessMove::Regular(rm)).collect()
+        moves.into_iter().map(ChessMove::Regular).collect()
     }
 
     fn valid_queen_moves_from(&self, from_index: ChessIndex, piece_color: Color) -> Vec<ChessMove> {
@@ -570,7 +570,7 @@ impl Game {
 
         let from_piece = self.board[from]
             .take_piece()
-            .expect(&format!("no piece on from: {}", from));
+            .unwrap_or_else(|| panic!("no piece on from: {}", from));
 
         let to_piece = self.board[to].take_piece();
         if let Some(piece) = &to_piece {
@@ -734,10 +734,10 @@ impl Display for CanCastleError {
                 format!("can't castle because {} is in check", idx)
             }
             CanCastleError::WrongPieces => {
-                format!("can't castle because at least one of the given squares was wrong")
+                "can't castle because at least one of the given squares was wrong".to_string()
             }
             CanCastleError::PiecesBetween => {
-                format!("can't castle because there are pieces between the king and rook")
+                "can't castle because there are pieces between the king and rook".to_string()
             }
             CanCastleError::PieceHasMadeMove(idx) => format!(
                 "can't castle because the piece at {} has already moved",
@@ -759,7 +759,7 @@ impl Display for MovePieceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = match self {
             MovePieceError::NoPieceToMove(index) => format!("no piece at {}", index),
-            MovePieceError::OwnPieceAtTarget => format!("can't move to a square you occupy"),
+            MovePieceError::OwnPieceAtTarget => "can't move to a square you occupy".to_string(),
         };
 
         write!(f, "{}", output)

@@ -47,45 +47,27 @@ impl Piece {
     }
 
     pub fn is_pawn(&self) -> bool {
-        match self.piece_type() {
-            PieceType::Pawn => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::Pawn)
     }
 
     pub fn is_knight(&self) -> bool {
-        match self.piece_type() {
-            PieceType::Knight => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::Knight)
     }
 
     pub fn is_rook(&self) -> bool {
-        match self.piece_type() {
-            PieceType::Rook => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::Rook)
     }
 
     pub fn is_bishop(&self) -> bool {
-        match self.piece_type() {
-            PieceType::Bishop => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::Bishop)
     }
 
     pub fn is_queen(&self) -> bool {
-        match self.piece_type() {
-            PieceType::Queen => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::Queen)
     }
 
     pub fn is_king(&self) -> bool {
-        match self.piece_type() {
-            PieceType::King => true,
-            _ => false,
-        }
+        matches!(self.piece_type(), PieceType::King)
     }
 
     pub fn pawn(color: Color) -> Self {
