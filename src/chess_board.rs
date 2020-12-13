@@ -1,4 +1,5 @@
 use crate::{file::FileIter, rank::RankIter, square::Square, ChessIndex, Color, File, Piece, Rank};
+use simple_grid::Grid;
 use std::{
     fmt::Display,
     ops::{Index, IndexMut},
@@ -6,7 +7,7 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub struct ChessBoard {
-    squares: [Square; 64],
+    squares: Grid<Square>,
 }
 
 impl ChessBoard {
@@ -55,19 +56,19 @@ impl Display for ChessBoard {
 impl Index<ChessIndex> for ChessBoard {
     type Output = Square;
     fn index(&self, index: ChessIndex) -> &Self::Output {
-        &self.squares[index.linear_value()]
+        &self.squares[&index]
     }
 }
 
 impl IndexMut<ChessIndex> for ChessBoard {
     fn index_mut(&mut self, index: ChessIndex) -> &mut Self::Output {
-        &mut self.squares[index.linear_value()]
+        &mut self.squares[&index]
     }
 }
 
 impl Default for ChessBoard {
     fn default() -> Self {
-        let squares = [
+        let squares = vec![
             // rank 1
             Square::empty(Color::Black), // a1
             Square::empty(Color::White), // b1
@@ -142,7 +143,9 @@ impl Default for ChessBoard {
             Square::empty(Color::Black), // h8
         ];
 
-        Self { squares }
+        Self {
+            squares: Grid::new(8, 8, squares),
+        }
     }
 }
 

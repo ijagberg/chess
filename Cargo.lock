@@ -3,3 +3,12 @@
 [[package]]
 name = "chess"
 version = "0.1.0"
+dependencies = [
+ "simple-grid",
+]
+
+[[package]]
+name = "simple-grid"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16b7ff7133e49a988c933687af43ae8665dd3e6c1f38098f8857b5ba12a58e8a"

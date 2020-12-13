@@ -12,11 +12,11 @@ mod square;
 pub use chess_board::ChessBoard;
 pub use chess_index::*;
 pub use chess_move::*;
+pub use consts::*;
 pub use file::{File, FileIter};
 pub use piece::*;
 pub use rank::{Rank, RankIter};
 
-use consts::*;
 use std::{convert::TryFrom, fmt::Display};
 
 #[derive(PartialEq, Clone, Copy, Debug, Eq)]
@@ -54,6 +54,7 @@ pub struct Game {
     black_taken: Vec<Piece>,
     history: Vec<ChessBoard>,
     move_history: Vec<ChessMove>,
+    current_player: Color,
 }
 
 impl Game {
@@ -488,8 +489,34 @@ impl Game {
             ChessMove::EnPassant(en_passant_move) => self.execute_en_passant_move(en_passant_move),
         }
 
+        self.current_player = self.current_player.opponent();
         self.move_history.push(chess_move);
         self.history.push(prev);
+    }
+
+    pub fn make_move(&mut self, from: ChessIndex, to: ChessIndex) -> Result<(), MakeMoveError> {
+        let _from_piece = match self.board().piece_at(from) {
+            Some(p) if p.color() == self.current_player => p,
+            Some(_p) => return Err(MakeMoveError::OtherPlayersPiece),
+            None => return Err(MakeMoveError::NoPieceToMove),
+        };
+
+        let valid_moves = self.valid_moves_from(from);
+
+        let move_to_execute = valid_moves.into_iter().find(|vm| match vm {
+            ChessMove::Regular(rm) => rm.from_idx() == from && rm.to_idx() == to,
+            ChessMove::Castle(cm) => cm.king_from() == from && cm.king_to() == to,
+            ChessMove::Promotion(pm) => pm.from_idx() == from && pm.to_idx() == to,
+            ChessMove::EnPassant(epm) => epm.from_idx() == from && epm.to_idx() == to,
+        });
+
+        match move_to_execute {
+            Some(m) => {
+                self.execute_move(m);
+                Ok(())
+            }
+            None => Err(MakeMoveError::InvalidMove),
+        }
     }
 
     fn execute_promotion_move(&mut self, promotion_move: PromotionMove) {
@@ -664,6 +691,7 @@ impl Game {
         rank_step: i32,
         color: Color,
     ) -> Vec<RegularMove> {
+        dbg!(start, file_step, rank_step, color);
         let mut moves = Vec::new();
         for idx in (0..)
             .map(|n| {
@@ -808,12 +836,36 @@ impl Default for Game {
         Self {
             board,
             white_king: E1,
-            black_king: E7,
+            black_king: E8,
             white_taken: Vec::new(),
             black_taken: Vec::new(),
             history: Vec::new(),
             move_history: Vec::new(),
+            current_player: White,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MakeMoveError {
+    WrongPlayer,
+    OtherPlayersPiece,
+    NoPieceToMove,
+    OwnPieceAtTarget,
+    InvalidMove,
+}
+
+impl Display for MakeMoveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = match self {
+            MakeMoveError::WrongPlayer => "wrong player",
+            MakeMoveError::OtherPlayersPiece => "can't move other player's piece",
+            MakeMoveError::NoPieceToMove => "no piece at from index",
+            MakeMoveError::OwnPieceAtTarget => "can't move to a square occupied by your piece",
+            MakeMoveError::InvalidMove => "invalid move",
+        };
+
+        write!(f, "{}", output)
     }
 }
 
@@ -1381,6 +1433,24 @@ mod tests {
 
         assert_eq!(game.board[E5].piece(), None);
         assert!(game.board[E7].piece().is_some());
+    }
+
+    #[test]
+    fn make_move() {
+        let mut game = Game::new();
+
+        print_board("initial", &game);
+        assert_eq!(game.make_move(E2, E4), Ok(()));
+        print_board("white king pawn to E4", &game);
+        assert_eq!(game.make_move(D7, D4), Err(MakeMoveError::InvalidMove));
+        assert_eq!(game.make_move(D7, D5), Ok(()));
+        print_board("black queen pawn to D5", &game);
+        assert_eq!(game.make_move(E4, D5), Ok(()));
+        print_board("white pawn takes D5", &game);
+        assert_eq!(game.make_move(C7, C6), Ok(()));
+        assert_eq!(game.make_move(D5, C6), Ok(()));
+        assert_eq!(game.make_move(G8, F6), Ok(()));
+        assert_eq!(game.make_move(C6, B7), Ok(()));
     }
 
     fn compare_regular_moves(actual: Vec<ChessMove>, expected: Vec<ChessMove>) {

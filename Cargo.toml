@@ -3,3 +3,6 @@ name = "chess"
 version = "0.1.0"
 authors = ["Isak Jägberg <ijagberg@gmail.com>"]
 edition = "2018"
+
+[dependencies]
+simple-grid = "0.1.2"

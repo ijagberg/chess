@@ -1,8 +1,15 @@
-use std::{convert::TryFrom, error::Error, fmt::Display, str::FromStr};
+use std::{
+    convert::TryFrom,
+    error::Error,
+    fmt::{Debug, Display},
+    str::FromStr,
+};
+
+use simple_grid::GridIndex;
 
 use crate::{File, FileIter, Rank, RankIter};
 
-#[derive(Copy, Clone, PartialEq, Debug, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct ChessIndex(pub(crate) File, pub(crate) Rank);
 
 impl ChessIndex {
@@ -121,6 +128,13 @@ impl From<(File, Rank)> for ChessIndex {
     }
 }
 
+/// So that we can index into simple_grid::Grid using a ChessIndex
+impl From<&ChessIndex> for GridIndex {
+    fn from(ci: &ChessIndex) -> Self {
+        GridIndex::new(u8::from(&ci.1) as usize - 1, u8::from(&ci.0) as usize - 1)
+    }
+}
+
 impl TryFrom<(i32, i32)> for ChessIndex {
     type Error = ();
     fn try_from((file, rank): (i32, i32)) -> Result<Self, Self::Error> {
@@ -153,6 +167,12 @@ impl FromStr for ChessIndex {
 }
 
 impl Display for ChessIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.file(), self.rank())
+    }
+}
+
+impl Debug for ChessIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.file(), self.rank())
     }
