@@ -9,7 +9,7 @@ use simple_grid::GridIndex;
 
 use crate::{File, FileIter, Rank, RankIter};
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ChessIndex(pub(crate) File, pub(crate) Rank);
 
 impl ChessIndex {

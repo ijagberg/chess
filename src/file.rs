@@ -5,7 +5,7 @@ use std::{
 };
 
 /// A chess file (vertical line)
-#[derive(Debug, Copy, PartialEq, Clone, Eq)]
+#[derive(Debug, Copy, PartialEq, Clone, Eq, Hash)]
 pub enum File {
     A,
     B,

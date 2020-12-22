@@ -7,7 +7,7 @@ use std::{
 use crate::Color;
 
 /// A chess rank (horizontal line)
-#[derive(Debug, Copy, PartialEq, Clone, Eq)]
+#[derive(Debug, Copy, PartialEq, Clone, Eq, Hash)]
 pub enum Rank {
     First,
     Second,

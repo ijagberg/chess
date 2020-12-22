@@ -1374,7 +1374,7 @@ mod tests {
         game.execute_move(ChessMove::regular(D2, D5));
         game.execute_move(ChessMove::regular(E7, E5));
 
-        print_board("black pawn moves two steps", &game);
+        print_board_with_highlights("black pawn moves two steps", &game, &[E5]);
 
         let mut valid_moves = game.valid_pawn_moves_from(D5, White);
         assert_eq!(
@@ -1461,12 +1461,14 @@ mod tests {
         }
     }
 
-    fn print_board(title: &str, game: &Game) {
+    fn print_board_with_highlights(title: &str, game: &Game, highlighted: &[ChessIndex]) {
+        let set: HashSet<_> = highlighted.iter().copied().collect();
         println!("{}:", title);
-        println!(
-            "{}",
-            board::fmt::whites_perspective(game.board(), HashSet::new())
-        );
+        println!("{}", board::fmt::whites_perspective(game.board(), &set));
         println!();
+    }
+
+    fn print_board(title: &str, game: &Game) {
+        print_board_with_highlights(title, game, &Vec::new())
     }
 }
