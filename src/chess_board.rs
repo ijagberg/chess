@@ -47,9 +47,19 @@ impl Display for ChessBoard {
                 pieces.push(output);
             }
 
-            lines.push(pieces.join(" "));
+            let mut line = format!("{}│ ", rank);
+            line.push_str(&pieces.join(" │ "));
+            line.push_str(" │\n");
+
+            lines.push(line);
         }
-        write!(f, "{}", lines.join("\n"))
+
+        let mut output = String::from("   a   b   c   d   e   f   g   h  \n");
+        output.push_str(" ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
+        output.push_str(&lines.join(" ├───┼───┼───┼───┼───┼───┼───┼───┤\n"));
+        output.push_str(" └───┴───┴───┴───┴───┴───┴───┴───┘");
+
+        write!(f, "{}", output)
     }
 }
 
