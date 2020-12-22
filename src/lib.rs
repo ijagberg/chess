@@ -1461,7 +1461,7 @@ mod tests {
 
     fn print_board(title: &str, game: &Game) {
         println!("{}:", title);
-        println!("{}", game.board);
+        println!("{}", game.board().blacks_perspective());
         println!();
     }
 }

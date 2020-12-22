@@ -29,10 +29,9 @@ impl ChessBoard {
     pub fn take_piece(&mut self, idx: ChessIndex) -> Option<Piece> {
         self[idx].take_piece()
     }
-}
 
-impl Display for ChessBoard {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    #[must_use]
+    pub fn whites_perspective(&self) -> String {
         let mut lines = Vec::new();
 
         for rank in RankIter::start_at(Rank::Eighth).rev() {
@@ -58,8 +57,43 @@ impl Display for ChessBoard {
         output.push_str(" ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
         output.push_str(&lines.join(" ├───┼───┼───┼───┼───┼───┼───┼───┤\n"));
         output.push_str(" └───┴───┴───┴───┴───┴───┴───┴───┘");
+        output
+    }
 
-        write!(f, "{}", output)
+    #[must_use]
+    pub fn blacks_perspective(&self) -> String {
+        let mut lines = Vec::new();
+
+        for rank in RankIter::start_at(Rank::First) {
+            let mut pieces = Vec::new();
+            for file in FileIter::start_at(File::H).rev() {
+                let chess_index = ChessIndex::from((file, rank));
+                let output = match self[chess_index].piece() {
+                    Some(p) => format!("{}", p),
+                    None => " ".to_string(),
+                };
+
+                pieces.push(output);
+            }
+
+            let mut line = format!("{}│ ", rank);
+            line.push_str(&pieces.join(" │ "));
+            line.push_str(" │\n");
+
+            lines.push(line);
+        }
+
+        let mut output = String::from("   h   g   f   e   d   c   b   a  \n");
+        output.push_str(" ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
+        output.push_str(&lines.join(" ├───┼───┼───┼───┼───┼───┼───┼───┤\n"));
+        output.push_str(" └───┴───┴───┴───┴───┴───┴───┴───┘");
+        output
+    }
+}
+
+impl Display for ChessBoard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.whites_perspective())
     }
 }
 
