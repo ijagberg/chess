@@ -870,6 +870,8 @@ impl Display for MakeMoveError {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use Color::*;
 
     use super::*;
@@ -1461,7 +1463,10 @@ mod tests {
 
     fn print_board(title: &str, game: &Game) {
         println!("{}:", title);
-        println!("{}", game.board().blacks_perspective());
+        println!(
+            "{}",
+            board::fmt::whites_perspective(game.board(), HashSet::new())
+        );
         println!();
     }
 }
