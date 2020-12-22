@@ -1,5 +1,6 @@
 use crate::{ChessIndex, PieceType};
 
+/// Enum describing a chess move.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum ChessMove {
     Regular(RegularMove),

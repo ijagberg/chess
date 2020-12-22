@@ -494,7 +494,7 @@ impl Game {
         self.history.push(prev);
     }
 
-    pub fn make_move(&mut self, from: ChessIndex, to: ChessIndex) -> Result<(), MakeMoveError> {
+    fn make_move(&mut self, from: ChessIndex, to: ChessIndex) -> Result<(), MakeMoveError> {
         let _from_piece = match self.board().piece_at(from) {
             Some(p) if p.color() == self.current_player => p,
             Some(_p) => return Err(MakeMoveError::OtherPlayersPiece),
@@ -691,7 +691,6 @@ impl Game {
         rank_step: i32,
         color: Color,
     ) -> Vec<RegularMove> {
-        dbg!(start, file_step, rank_step, color);
         let mut moves = Vec::new();
         for idx in (0..)
             .map(|n| {
