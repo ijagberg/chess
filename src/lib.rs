@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-mod chess_board;
+mod board;
 mod chess_index;
 mod chess_move;
 mod consts;
@@ -9,7 +9,7 @@ mod piece;
 mod rank;
 mod square;
 
-pub use chess_board::ChessBoard;
+pub use board::ChessBoard;
 pub use chess_index::*;
 pub use chess_move::*;
 pub use consts::*;
