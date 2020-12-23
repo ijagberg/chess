@@ -9,9 +9,9 @@ mod piece;
 mod rank;
 mod square;
 
-pub use board::ChessBoard;
 #[cfg(feature = "fmt")]
 pub use board::fmt;
+pub use board::ChessBoard;
 pub use chess_index::*;
 pub use chess_move::*;
 pub use consts::*;
@@ -406,6 +406,19 @@ impl Game {
                 Some(p) if p.color() == piece_color => {}
                 _ => moves.push(ChessMove::regular(from_index, idx)),
             }
+        }
+
+        let (left, right) = match piece_color {
+            Color::Black => (A8, H8),
+            Color::White => (A1, H1),
+        };
+
+        if let Ok(castle_move) = self.can_castle(from_index, left) {
+            moves.push(ChessMove::Castle(castle_move));
+        }
+
+        if let Ok(castle_move) = self.can_castle(from_index, right) {
+            moves.push(ChessMove::Castle(castle_move));
         }
 
         moves
@@ -1443,6 +1456,37 @@ mod tests {
         assert!(game.board[E7].piece().is_some());
     }
 
+    #[test]
+    fn ruy_lopez() {
+        let mut game = Game::new();
+
+        execute_sequence_of_regular_moves(
+            &mut game,
+            &[
+                (E2, E4),
+                (E7, E5),
+                (G1, F3),
+                (B8, C6),
+                (F1, B5),
+                (A7, A6),
+                (B5, A4),
+                (B7, B5),
+                (A4, B3),
+                (G8, F6),
+            ],
+        );
+
+        let valid_king_moves = game.valid_moves_from(E1);
+        assert_eq!(
+            valid_king_moves,
+            [
+                ChessMove::Regular(RegularMove::new(E1, F1)),
+                ChessMove::Regular(RegularMove::new(E1, E2)),
+                ChessMove::Castle(CastleMove::new(E1, G1, H1, F1)),
+            ]
+        );
+    }
+
     fn compare_regular_moves(actual: Vec<ChessMove>, expected: Vec<ChessMove>) {
         assert_eq!(actual.len(), expected.len());
         for (actual, expected) in actual.into_iter().zip(expected.into_iter()) {
@@ -1459,5 +1503,12 @@ mod tests {
 
     fn print_board(title: &str, game: &Game) {
         print_board_with_highlights(title, game, &Vec::new())
+    }
+
+    fn execute_sequence_of_regular_moves(game: &mut Game, sequence: &[(ChessIndex, ChessIndex)]) {
+        for &(from, to) in sequence {
+            print_board_with_highlights(&format!("{} to {}", from, to), game, &[from, to]);
+            game.make_move(ChessMove::regular(from, to)).unwrap();
+        }
     }
 }
