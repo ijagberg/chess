@@ -17,7 +17,7 @@ pub use file::{File, FileIter};
 pub use piece::*;
 pub use rank::{Rank, RankIter};
 
-use std::{convert::TryFrom, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt::Display};
 
 #[derive(PartialEq, Clone, Copy, Debug, Eq)]
 pub enum Color {
@@ -55,6 +55,7 @@ pub struct Game {
     history: Vec<ChessBoard>,
     move_history: Vec<ChessMove>,
     current_player: Color,
+    move_cache: RefCell<HashMap<ChessIndex, Vec<ChessMove>>>,
 }
 
 impl Game {
@@ -237,6 +238,9 @@ impl Game {
     }
 
     pub fn valid_moves_from(&self, from_index: ChessIndex) -> Vec<ChessMove> {
+        if let Some(cached_moves) = self.move_cache.borrow().get(&from_index) {
+            return cached_moves.clone();
+        }
         let mut clone = self.clone();
 
         let piece = match clone.board[from_index].piece() {
@@ -265,6 +269,9 @@ impl Game {
             clone.undo_last_move();
         }
 
+        self.move_cache
+            .borrow_mut()
+            .insert(from_index, actual_valid_moves.clone());
         actual_valid_moves
     }
 
@@ -479,10 +486,29 @@ impl Game {
         }
     }
 
-    pub fn execute_move(&mut self, chess_move: ChessMove) {
+    pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), ()> {
+        let from_index = match chess_move {
+            ChessMove::Regular(rm) => rm.from_idx(),
+            ChessMove::Castle(cm) => cm.king_from(),
+            ChessMove::Promotion(pm) => pm.from_idx(),
+            ChessMove::EnPassant(em) => em.from_idx(),
+        };
+
+        let valid_moves = self.valid_moves_from(from_index);
+
+        if !valid_moves.contains(&chess_move) {
+            return Err(());
+        }
+
+        self.execute_move(chess_move);
+
+        Ok(())
+    }
+
+    fn execute_move(&mut self, valid_move: ChessMove) {
         let prev = self.board.clone();
 
-        match chess_move {
+        match valid_move {
             ChessMove::Regular(regular_move) => self.execute_regular_move(regular_move),
             ChessMove::Castle(castle_move) => self.execute_castle_move(castle_move),
             ChessMove::Promotion(promotion_move) => self.execute_promotion_move(promotion_move),
@@ -490,33 +516,9 @@ impl Game {
         }
 
         self.current_player = self.current_player.opponent();
-        self.move_history.push(chess_move);
+        self.move_history.push(valid_move);
         self.history.push(prev);
-    }
-
-    fn make_move(&mut self, from: ChessIndex, to: ChessIndex) -> Result<(), MakeMoveError> {
-        let _from_piece = match self.board().piece_at(from) {
-            Some(p) if p.color() == self.current_player => p,
-            Some(_p) => return Err(MakeMoveError::OtherPlayersPiece),
-            None => return Err(MakeMoveError::NoPieceToMove),
-        };
-
-        let valid_moves = self.valid_moves_from(from);
-
-        let move_to_execute = valid_moves.into_iter().find(|vm| match vm {
-            ChessMove::Regular(rm) => rm.from_idx() == from && rm.to_idx() == to,
-            ChessMove::Castle(cm) => cm.king_from() == from && cm.king_to() == to,
-            ChessMove::Promotion(pm) => pm.from_idx() == from && pm.to_idx() == to,
-            ChessMove::EnPassant(epm) => epm.from_idx() == from && epm.to_idx() == to,
-        });
-
-        match move_to_execute {
-            Some(m) => {
-                self.execute_move(m);
-                Ok(())
-            }
-            None => Err(MakeMoveError::InvalidMove),
-        }
+        self.move_cache.borrow_mut().clear();
     }
 
     fn execute_promotion_move(&mut self, promotion_move: PromotionMove) {
@@ -841,6 +843,7 @@ impl Default for Game {
             history: Vec::new(),
             move_history: Vec::new(),
             current_player: White,
+            move_cache: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -1326,7 +1329,7 @@ mod tests {
             ]
         );
 
-        game.execute_move(actual_valid_moves[1]);
+        game.make_move(actual_valid_moves[1]).unwrap();
         print_board("promoted to rook on B8", &game);
         assert_eq!(
             game.board[B8].piece().unwrap().piece_type(),
@@ -1346,16 +1349,16 @@ mod tests {
         game.board.set_piece(H8, Piece::king(Black));
 
         print_board(
-            "white pawn can't promote because it would check the white king",
+            "white pawn on E7 can't promote because it would check the white king",
             &game,
         );
 
         let actual_valid_moves = game.valid_moves_from(E7);
         assert_eq!(actual_valid_moves, vec![]);
 
-        game.board.take_piece(E8).unwrap();
+        game.execute_move(ChessMove::regular(E8, G8));
 
-        print_board("white pawn can promote", &game);
+        print_board("white pawn on E7 can promote", &game);
 
         let actual_valid_moves = game.valid_moves_from(E7);
 
@@ -1371,8 +1374,10 @@ mod tests {
 
         print_board("initial", &game);
 
-        game.execute_move(ChessMove::regular(D2, D5));
-        game.execute_move(ChessMove::regular(E7, E5));
+        game.make_move(ChessMove::regular(D2, D4)).unwrap();
+        game.make_move(ChessMove::regular(H7, H6)).unwrap();
+        game.make_move(ChessMove::regular(D4, D5)).unwrap();
+        game.make_move(ChessMove::regular(E7, E5)).unwrap();
 
         print_board_with_highlights("black pawn moves two steps", &game, &[E5]);
 
@@ -1387,9 +1392,9 @@ mod tests {
 
         let en_passant_move = valid_moves.remove(1);
 
-        game.execute_move(en_passant_move);
+        game.make_move(en_passant_move).unwrap();
 
-        print_board("after en passant", &game);
+        print_board_with_highlights("after en passant", &game, &[E6]);
     }
 
     #[test]
@@ -1398,18 +1403,18 @@ mod tests {
 
         let white_pawn = game.board.take_piece(E2).unwrap();
         game.board.set_piece(E5, white_pawn);
-        game.execute_move(ChessMove::regular(F7, F5));
+        game.make_move(ChessMove::regular(F7, F5)).unwrap();
 
         assert!(game.can_en_passant(F5));
 
-        game.execute_move(ChessMove::regular(A7, A6));
+        game.make_move(ChessMove::regular(A7, A6)).unwrap();
 
         assert!(!game.can_en_passant(F5));
 
         let mut game = Game::new();
         let white_pawn = game.board.take_piece(D2).unwrap();
         game.board.set_piece(D5, white_pawn);
-        game.execute_move(ChessMove::regular(E7, E5));
+        game.make_move(ChessMove::regular(E7, E5)).unwrap();
 
         assert!(game.can_en_passant(E5));
     }
@@ -1420,11 +1425,11 @@ mod tests {
 
         print_board("initial", &game);
 
-        game.execute_move(ChessMove::regular(E2, E4));
+        game.make_move(ChessMove::regular(E2, E4)).unwrap();
 
         print_board("white pawn to E4", &game);
 
-        game.execute_move(ChessMove::regular(E7, E5));
+        game.make_move(ChessMove::regular(E7, E5)).unwrap();
 
         print_board("black pawn to E5", &game);
 
@@ -1434,24 +1439,6 @@ mod tests {
 
         assert_eq!(game.board[E5].piece(), None);
         assert!(game.board[E7].piece().is_some());
-    }
-
-    #[test]
-    fn make_move() {
-        let mut game = Game::new();
-
-        print_board("initial", &game);
-        assert_eq!(game.make_move(E2, E4), Ok(()));
-        print_board("white king pawn to E4", &game);
-        assert_eq!(game.make_move(D7, D4), Err(MakeMoveError::InvalidMove));
-        assert_eq!(game.make_move(D7, D5), Ok(()));
-        print_board("black queen pawn to D5", &game);
-        assert_eq!(game.make_move(E4, D5), Ok(()));
-        print_board("white pawn takes D5", &game);
-        assert_eq!(game.make_move(C7, C6), Ok(()));
-        assert_eq!(game.make_move(D5, C6), Ok(()));
-        assert_eq!(game.make_move(G8, F6), Ok(()));
-        assert_eq!(game.make_move(C6, B7), Ok(()));
     }
 
     fn compare_regular_moves(actual: Vec<ChessMove>, expected: Vec<ChessMove>) {
