@@ -10,6 +10,8 @@ mod rank;
 mod square;
 
 pub use board::ChessBoard;
+#[cfg(feature = "fmt")]
+pub use board::fmt;
 pub use chess_index::*;
 pub use chess_move::*;
 pub use consts::*;
