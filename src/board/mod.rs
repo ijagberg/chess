@@ -11,6 +11,12 @@ pub struct ChessBoard {
 }
 
 impl ChessBoard {
+    pub(crate) fn move_piece(&mut self, from: ChessIndex, to: ChessIndex) {
+        if let Some(piece) = self.take_piece(from) {
+            self.set_piece(to, piece);
+        }
+    }
+
     pub fn piece_at(&self, idx: ChessIndex) -> Option<&Piece> {
         self[idx].piece()
     }

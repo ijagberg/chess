@@ -69,6 +69,10 @@ impl Game {
         &self.board
     }
 
+    fn board_mut(&mut self) -> &mut ChessBoard {
+        &mut self.board
+    }
+
     pub fn white_king(&self) -> ChessIndex {
         self.white_king
     }
@@ -533,6 +537,10 @@ impl Game {
         self.current_player = self.current_player.opponent();
         self.move_history.push(valid_move);
         self.history.push(prev);
+        self.clear_move_cache();
+    }
+
+    fn clear_move_cache(&mut self) {
         self.move_cache.borrow_mut().clear();
     }
 
@@ -897,12 +905,17 @@ mod tests {
     #[test]
     fn rook_moves() {
         let mut game = Game::new();
-        game.execute_regular_move(RegularMove::new(A1, E4));
 
-        print_board("rook in center", &game);
+        let board = game.board_mut();
+
+        board.move_piece(A1, E4);
+
+        let valid_rook_moves = game.valid_moves_from(E4);
+
+        print_board_with_highlights("rook in center", &game, &to_indices(&valid_rook_moves));
 
         assert_eq!(
-            game.valid_rook_moves_from(E4, White),
+            valid_rook_moves,
             vec![
                 ChessMove::regular(E4, E5),
                 ChessMove::regular(E4, E6),
@@ -923,12 +936,15 @@ mod tests {
     fn knight_moves() {
         let mut game = Game::new();
 
-        game.execute_regular_move((G1, E4));
+        let board = game.board_mut();
+        board.move_piece(G1, E4);
 
-        print_board("knight in center", &game);
+        let valid_knight_moves = game.valid_moves_from(E4);
+
+        print_board_with_highlights("knight in center", &game, &to_indices(&valid_knight_moves));
 
         assert_eq!(
-            game.valid_knight_moves_from(E4, White),
+            valid_knight_moves,
             vec![
                 ChessMove::regular(E4, G5),
                 ChessMove::regular(E4, G3),
@@ -944,12 +960,14 @@ mod tests {
     fn bishop_moves() {
         let mut game = Game::new();
 
-        game.execute_regular_move((F1, F4));
+        let board = game.board_mut();
+        board.move_piece(F1, F4);
 
-        print_board("bishop on F4", &game);
+        let valid_bishop_moves = game.valid_moves_from(F4);
+        print_board_with_highlights("bishop in center", &game, &to_indices(&valid_bishop_moves));
 
         assert_eq!(
-            game.valid_bishop_moves_from(F4, White),
+            valid_bishop_moves,
             vec![
                 ChessMove::regular(F4, G5),
                 ChessMove::regular(F4, H6),
@@ -965,12 +983,15 @@ mod tests {
     #[test]
     fn queen_moves() {
         let mut game = Game::new();
-        game.execute_regular_move((D1, D4));
 
-        print_board("queen on D4", &game);
+        let board = game.board_mut();
+        board.move_piece(D1, D4);
+
+        let valid_queen_moves = game.valid_moves_from(D4);
+        print_board_with_highlights("queen on D4", &game, &to_indices(&valid_queen_moves));
 
         assert_eq!(
-            game.valid_queen_moves_from(D4, White),
+            valid_queen_moves,
             vec![
                 ChessMove::regular(D4, D5),
                 ChessMove::regular(D4, D6),
@@ -999,16 +1020,21 @@ mod tests {
     fn king_moves() {
         let mut game = Game::new();
 
-        print_board("initial", &game);
+        let valid_king_moves = game.valid_moves_from(E1);
 
-        compare_regular_moves(game.valid_king_moves_from(E1, White), vec![]);
+        print_board_with_highlights("king has not moved", &game, &to_indices(&valid_king_moves));
 
-        game.execute_regular_move((E1, E4));
+        assert_eq!(valid_king_moves, vec![]);
 
-        print_board("king on E4", &game);
+        let board = game.board_mut();
+        board.move_piece(E1, E4);
 
-        compare_regular_moves(
-            game.valid_king_moves_from(E4, White),
+        let valid_king_moves = game.valid_moves_from(E4);
+
+        print_board_with_highlights("king on e4", &game, &to_indices(&valid_king_moves));
+
+        assert_eq!(
+            valid_king_moves,
             vec![
                 ChessMove::regular(E4, F5),
                 ChessMove::regular(E4, F3),
@@ -1021,10 +1047,20 @@ mod tests {
             ],
         );
 
-        game.execute_regular_move((F7, F6));
-        print_board("-", &game);
-        compare_regular_moves(
-            game.valid_moves_from(E4),
+        let board = game.board_mut();
+        board.move_piece(F7, F6);
+        game.clear_move_cache();
+
+        let valid_king_moves = game.valid_moves_from(E4);
+
+        print_board_with_highlights(
+            "king on e4, but pawn has moved",
+            &game,
+            &to_indices(&valid_king_moves),
+        );
+
+        assert_eq!(
+            valid_king_moves,
             vec![
                 ChessMove::regular(E4, F5),
                 ChessMove::regular(E4, F3),
@@ -1041,13 +1077,13 @@ mod tests {
     fn is_checked_by_pawn() {
         let mut game = Game::new();
 
-        game.execute_regular_move((E1, E4));
+        game.board_mut().move_piece(E1, E4);
 
         print_board("king on E4", &game);
 
         assert_eq!(game.is_checked_by_pawn(E4, White), None);
 
-        game.execute_regular_move((D7, D5));
+        game.board_mut().move_piece(D7, D5);
 
         print_board("pawn checking king", &game);
 
@@ -1058,13 +1094,13 @@ mod tests {
     fn is_checked_by_knight() {
         let mut game = Game::new();
 
-        game.execute_regular_move((E1, E4));
+        game.board_mut().move_piece(E1, E4);
 
         print_board("king on E4", &game);
 
         assert_eq!(game.is_checked_by_knight(E4, White), None);
 
-        game.execute_regular_move((G8, F6));
+        game.board_mut().move_piece(G8, F6);
 
         print_board("knight checking from F6", &game);
 
@@ -1075,19 +1111,19 @@ mod tests {
     fn is_checked_by_bishop() {
         let mut game = Game::new();
 
-        game.execute_regular_move((E1, E4));
+        game.board_mut().move_piece(E1, E4);
 
         print_board("king on E4", &game);
 
         assert_eq!(game.is_checked_diagonal(E4, White), None);
 
-        game.execute_regular_move((C8, G6));
+        game.board_mut().move_piece(C8, G6);
 
         print_board("bishop checking from G6", &game);
 
         assert_eq!(game.is_checked_diagonal(E4, White), Some(G6));
 
-        game.execute_regular_move((F2, F5));
+        game.board_mut().move_piece(F2, F5);
 
         print_board("white bishop blocks the check", &game);
 
@@ -1098,19 +1134,19 @@ mod tests {
     fn is_checked_by_rook() {
         let mut game = Game::new();
 
-        game.execute_regular_move((E1, E4));
+        game.board_mut().move_piece(E1, E4);
 
         print_board("king on E4", &game);
 
         assert_eq!(game.is_checked_vertical_horizontal(E4, White), None);
 
-        game.execute_regular_move((H8, H4));
+        game.board_mut().move_piece(H8, H4);
 
         print_board("rook checking from H4", &game);
 
         assert_eq!(game.is_checked_vertical_horizontal(E4, White), Some(H4));
 
-        game.execute_regular_move((G2, G4));
+        game.board_mut().move_piece(G2, G4);
 
         print_board("white pawn blocks the check", &game);
 
@@ -1121,25 +1157,25 @@ mod tests {
     fn is_checked_by_queen() {
         let mut game = Game::new();
 
-        game.execute_regular_move((E1, E4));
+        game.board_mut().move_piece(E1, E4);
 
         print_board("king on E4", &game);
 
         assert_eq!(game.is_checked(E4, White), false);
 
-        game.execute_regular_move((D8, C6));
+        game.board_mut().move_piece(D8, C6);
 
         print_board("queen checking from C6", &game);
 
         assert_eq!(game.is_checked_diagonal(E4, White), Some(C6));
 
-        game.execute_regular_move((C6, B4));
+        game.board_mut().move_piece(C6, B4);
 
         print_board("queen checking from B4", &game);
 
         assert_eq!(game.is_checked_vertical_horizontal(E4, White), Some(B4));
 
-        game.execute_regular_move((C1, D4));
+        game.board_mut().move_piece(C1, D4);
 
         print_board("white bishop blocking check", &game);
 
@@ -1162,7 +1198,9 @@ mod tests {
         game.board[G2].take_piece();
 
         // move black rook to check square between white king and white rook
-        game.execute_regular_move((H8, G6));
+        game.board_mut().move_piece(H8, G6);
+
+        print_board_with_highlights("black rook on G6 checks square between king and rook", &game, &[G6, G1]);
 
         assert_eq!(
             game.can_castle(E1, H1),
@@ -1181,34 +1219,6 @@ mod tests {
             game.can_castle(E1, G1),
             Err(CanCastleError::PieceHasMadeMove(G1))
         ); // rook has moved now
-    }
-
-    #[test]
-    fn execute_castle_move() {
-        let mut game = Game::new();
-
-        print_board("initial", &game);
-
-        game.board[F1].clear();
-        game.board[G1].clear();
-
-        print_board("cleared", &game);
-
-        let castle_move = game.can_castle(E1, H1).unwrap();
-
-        game.execute_castle_move(castle_move);
-
-        print_board("after", &game);
-
-        assert_eq!(game.board[E1].piece(), None);
-        assert_eq!(game.board[H1].piece(), None);
-
-        let rook = game.board[F1].piece().unwrap();
-        assert_eq!(rook.history(), &vec![H1, F1]);
-
-        let king = game.board[G1].piece().unwrap();
-        assert!(king.is_king());
-        assert_eq!(king.history(), &vec![E1, G1]);
     }
 
     #[test]
@@ -1487,13 +1497,6 @@ mod tests {
         );
     }
 
-    fn compare_regular_moves(actual: Vec<ChessMove>, expected: Vec<ChessMove>) {
-        assert_eq!(actual.len(), expected.len());
-        for (actual, expected) in actual.into_iter().zip(expected.into_iter()) {
-            assert_eq!(actual, expected);
-        }
-    }
-
     fn print_board_with_highlights(title: &str, game: &Game, highlighted: &[ChessIndex]) {
         let set: HashSet<_> = highlighted.iter().copied().collect();
         println!("{}:", title);
@@ -1510,5 +1513,17 @@ mod tests {
             print_board_with_highlights(&format!("{} to {}", from, to), game, &[from, to]);
             game.make_move(ChessMove::regular(from, to)).unwrap();
         }
+    }
+
+    fn to_indices(moves: &[ChessMove]) -> Vec<ChessIndex> {
+        moves
+            .iter()
+            .map(|m| match m {
+                ChessMove::Regular(rm) => rm.to_idx(),
+                ChessMove::Castle(cm) => cm.king_to(),
+                ChessMove::Promotion(pm) => pm.to_idx(),
+                ChessMove::EnPassant(epm) => epm.to_idx(),
+            })
+            .collect()
     }
 }
