@@ -1,6 +1,7 @@
 use crate::{Color, Piece};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Square {
     color: Color,
     piece: Option<Piece>,

@@ -6,6 +6,7 @@ use simple_grid::Grid;
 use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChessBoard {
     squares: Grid<Square>,
 }
