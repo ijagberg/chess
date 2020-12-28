@@ -7,6 +7,8 @@ edition = "2018"
 [features]
 default = ["fmt"]
 fmt = []
+online = ["serde"]
 
 [dependencies]
 simple-grid = "0.1.2"
+serde = { version = "1.0.118", features = ["derive"], optional = true }

@@ -116,6 +116,7 @@ impl Display for Piece {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PieceType {
     Pawn,
     Knight,

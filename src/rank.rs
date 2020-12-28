@@ -8,6 +8,7 @@ use crate::Color;
 
 /// A chess rank (horizontal line)
 #[derive(Debug, Copy, PartialEq, Clone, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Rank {
     First,
     Second,

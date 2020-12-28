@@ -10,6 +10,7 @@ use simple_grid::GridIndex;
 use crate::{File, FileIter, Rank, RankIter};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChessIndex(pub(crate) File, pub(crate) Rank);
 
 impl ChessIndex {

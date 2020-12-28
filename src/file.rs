@@ -6,6 +6,7 @@ use std::{
 
 /// A chess file (vertical line)
 #[derive(Debug, Copy, PartialEq, Clone, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum File {
     A,
     B,

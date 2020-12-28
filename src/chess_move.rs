@@ -2,6 +2,7 @@ use crate::{ChessIndex, PieceType};
 
 /// Enum describing a chess move.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ChessMove {
     Regular(RegularMove),
     Castle(CastleMove),
@@ -36,6 +37,7 @@ impl ChessMove {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RegularMove(ChessIndex, ChessIndex);
 
 impl RegularMove {
@@ -59,6 +61,7 @@ impl From<(ChessIndex, ChessIndex)> for RegularMove {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CastleMove(ChessIndex, ChessIndex, ChessIndex, ChessIndex);
 
 impl CastleMove {
@@ -89,6 +92,7 @@ impl CastleMove {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PromotionMove(ChessIndex, ChessIndex, PieceType);
 
 impl PromotionMove {
@@ -110,6 +114,7 @@ impl PromotionMove {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EnPassantMove(ChessIndex, ChessIndex, ChessIndex);
 
 impl EnPassantMove {
