@@ -22,6 +22,7 @@ pub use rank::{Rank, RankIter};
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt::Display};
 
 #[derive(PartialEq, Clone, Copy, Debug, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Color {
     Black,
     White,

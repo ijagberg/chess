@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::{ChessIndex, Color};
 
 #[derive(Clone, PartialEq, Debug, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Piece {
     piece_type: PieceType,
     color: Color,
