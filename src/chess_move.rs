@@ -1,136 +1,223 @@
-use crate::{ChessIndex, PieceType};
+use crate::{board::Board, game::Game, piece::PieceType::Pawn, Color, Position};
+use std::option::Option;
 
-/// Enum describing a chess move.
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, Copy)]
 pub enum ChessMove {
-    Regular(RegularMove),
-    Castle(CastleMove),
-    Promotion(PromotionMove),
-    EnPassant(EnPassantMove),
+    Regular {
+        from: Position,
+        to: Position,
+    },
+    EnPassant {
+        from: Position,
+        to: Position,
+    },
+    Promotion {
+        from: Position,
+        to: Position,
+        piece: PromotionPiece,
+    },
+    Castle {
+        rook_from: Position,
+        rook_to: Position,
+        king_from: Position,
+        king_to: Position,
+    },
 }
 
 impl ChessMove {
-    pub fn regular(from: ChessIndex, to: ChessIndex) -> ChessMove {
-        ChessMove::Regular(RegularMove::new(from, to))
-    }
-
-    pub fn promotions(from: ChessIndex, to: ChessIndex) -> Vec<ChessMove> {
-        vec![
-            PieceType::Knight,
-            PieceType::Rook,
-            PieceType::Queen,
-            PieceType::Bishop,
-        ]
-        .into_iter()
-        .map(|pt| ChessMove::promotion(from, to, pt))
-        .collect()
-    }
-
-    pub fn promotion(from: ChessIndex, to: ChessIndex, promotion_piece: PieceType) -> ChessMove {
-        ChessMove::Promotion(PromotionMove::new(from, to, promotion_piece))
-    }
-
-    pub fn en_passant(from: ChessIndex, to: ChessIndex, taken_pawn_idx: ChessIndex) -> ChessMove {
-        ChessMove::EnPassant(EnPassantMove::new(from, to, taken_pawn_idx))
+    pub(crate) fn to(&self) -> Position {
+        *match self {
+            ChessMove::Regular { from: _, to } => to,
+            ChessMove::EnPassant { from: _, to } => to,
+            ChessMove::Promotion {
+                from: _,
+                to,
+                piece: _,
+            } => to,
+            ChessMove::Castle {
+                rook_from: _,
+                rook_to: _,
+                king_from: _,
+                king_to,
+            } => king_to,
+        }
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RegularMove(ChessIndex, ChessIndex);
+#[derive(Debug, Clone, Copy)]
+pub enum PromotionPiece {
+    Knight,
+    Bishop,
+    Rook,
+    Queen,
+}
 
-impl RegularMove {
-    pub fn new(from: ChessIndex, to: ChessIndex) -> Self {
-        Self(from, to)
+pub(crate) struct MoveManager;
+
+impl MoveManager {
+    pub fn get_legal_moves(&self, game: &Game) -> Vec<ChessMove> {
+        let player = game.current_player();
+        let board = game.board();
+
+        let mut legal_moves = Vec::new();
+        for pos in Position::all_iter() {
+            let mut legal_moves_from_pos = self.get_legal_moves_from(board, pos, player);
+            legal_moves.append(&mut legal_moves_from_pos);
+        }
+
+        legal_moves
     }
 
-    pub fn from_idx(&self) -> ChessIndex {
-        self.0
+    fn get_legal_moves_from(&self, board: &Board, from: Position, player: Color) -> Vec<ChessMove> {
+        if let Some(piece) = board[from] {
+            if piece.color() == player {
+                return match piece.kind() {
+                    Pawn => {
+                        todo!()
+                    }
+                    Knight => {
+                        todo!()
+                    }
+                    Bishop => self.get_legal_bishop_moves_from(board, from, player),
+                    Rook => self.get_legal_rook_moves_from(board, from, player),
+                    Queen => {
+                        todo!()
+                    }
+                    King => {
+                        todo!()
+                    }
+                };
+            }
+        }
+        Vec::new()
     }
 
-    pub fn to_idx(&self) -> ChessIndex {
-        self.1
+    fn get_legal_bishop_moves_from(
+        &self,
+        board: &Board,
+        from: Position,
+        player: Color,
+    ) -> Vec<ChessMove> {
+        let mut positions = Vec::new();
+
+        let mut up_file_up_rank = self.step_until_collision(from, 1, 1, board, player);
+        positions.append(&mut up_file_up_rank);
+
+        let mut up_file_down_rank = self.step_until_collision(from, 1, -1, board, player);
+        positions.append(&mut up_file_down_rank);
+
+        let mut down_file_up_rank = self.step_until_collision(from, -1, 1, board, player);
+        positions.append(&mut down_file_up_rank);
+
+        let mut down_file_down_rank = self.step_until_collision(from, -1, -1, board, player);
+        positions.append(&mut down_file_down_rank);
+
+        let legal_moves = positions
+            .into_iter()
+            .map(|to| ChessMove::Regular { from, to })
+            .collect();
+
+        legal_moves
+    }
+
+    fn get_legal_rook_moves_from(
+        &self,
+        board: &Board,
+        from: Position,
+        player: Color,
+    ) -> Vec<ChessMove> {
+        let mut positions = Vec::new();
+
+        let mut up_file = self.step_until_collision(from, 1, 0, board, player);
+        positions.append(&mut up_file);
+
+        let mut down_file = self.step_until_collision(from, -1, 0, board, player);
+        positions.append(&mut down_file);
+
+        let mut up_rank = self.step_until_collision(from, 0, 1, board, player);
+        positions.append(&mut up_rank);
+
+        let mut down_rank = self.step_until_collision(from, 0, -1, board, player);
+        positions.append(&mut down_rank);
+
+        let legal_moves = positions
+            .into_iter()
+            .map(|to| ChessMove::Regular { from, to })
+            .collect();
+
+        legal_moves
+    }
+
+    fn step_until_collision(
+        &self,
+        start: Position,
+        file_step: i32,
+        rank_step: i32,
+        board: &Board,
+        player: Color,
+    ) -> Vec<Position> {
+        let mut positions = Vec::new();
+        for steps in 1.. {
+            if let Some(position) = start.add_offset(file_step * steps, rank_step * steps) {
+                match board.get_piece(position) {
+                    Option::Some(piece) => {
+                        if !piece.is_color(player) {
+                            positions.push(position);
+                        }
+                        break;
+                    }
+                    Option::None => {
+                        positions.push(position);
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        positions
     }
 }
 
-impl From<(ChessIndex, ChessIndex)> for RegularMove {
-    fn from((from, to): (ChessIndex, ChessIndex)) -> Self {
-        RegularMove::new(from, to)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::consts::*;
+    use Color::*;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CastleMove(ChessIndex, ChessIndex, ChessIndex, ChessIndex);
+    #[test]
+    fn bishop_moves() {
+        let manager = MoveManager;
+        let board = Board::default();
 
-impl CastleMove {
-    pub fn new(
-        king_from: ChessIndex,
-        king_to: ChessIndex,
-        rook_from: ChessIndex,
-        rook_to: ChessIndex,
-    ) -> CastleMove {
-        CastleMove(king_from, king_to, rook_from, rook_to)
-    }
+        let bishop_moves_from_f4: Vec<Position> = manager
+            .get_legal_bishop_moves_from(&board, F4, White)
+            .iter()
+            .map(|m| m.to())
+            .collect();
+        assert_eq!(bishop_moves_from_f4, vec![G5, H6, G3, E5, D6, C7, E3]);
 
-    pub fn king_from(&self) -> ChessIndex {
-        self.0
-    }
-
-    pub fn king_to(&self) -> ChessIndex {
-        self.1
+        let bishop_moves_from_c1: Vec<Position> = manager
+            .get_legal_bishop_moves_from(&board, C1, White)
+            .iter()
+            .map(|m| m.to())
+            .collect();
+        assert_eq!(bishop_moves_from_c1, vec![]);
     }
 
-    pub fn rook_from(&self) -> ChessIndex {
-        self.2
-    }
+    #[test]
+    fn rook_moves() {
+        let manager = MoveManager;
+        let board = Board::default();
 
-    pub fn rook_to(&self) -> ChessIndex {
-        self.3
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PromotionMove(ChessIndex, ChessIndex, PieceType);
-
-impl PromotionMove {
-    pub fn new(from: ChessIndex, to: ChessIndex, promotion_piece: PieceType) -> Self {
-        Self(from, to, promotion_piece)
-    }
-
-    pub fn from_idx(&self) -> ChessIndex {
-        self.0
-    }
-
-    pub fn to_idx(&self) -> ChessIndex {
-        self.1
-    }
-
-    pub fn promotion_piece(&self) -> PieceType {
-        self.2
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EnPassantMove(ChessIndex, ChessIndex, ChessIndex);
-
-impl EnPassantMove {
-    pub fn new(from: ChessIndex, to: ChessIndex, taken_pawn_idx: ChessIndex) -> Self {
-        Self(from, to, taken_pawn_idx)
-    }
-
-    pub fn from_idx(&self) -> ChessIndex {
-        self.0
-    }
-
-    pub fn to_idx(&self) -> ChessIndex {
-        self.1
-    }
-
-    pub fn taken_pawn_idx(&self) -> ChessIndex {
-        self.2
+        let rook_moves_from_c5: Vec<Position> = manager
+            .get_legal_rook_moves_from(&board, C5, Black)
+            .iter()
+            .map(|m| m.to())
+            .collect();
+        assert_eq!(
+            rook_moves_from_c5,
+            vec![D5, E5, F5, G5, H5, B5, A5, C6, C4, C3, C2]
+        );
     }
 }
