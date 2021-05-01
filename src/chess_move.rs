@@ -172,21 +172,13 @@ impl MoveManager {
             }
 
             if let Some(front_left) = from.add_offset(1, -1) {
-                if let Some(Piece {
-                    color: Color::White,
-                    ..
-                }) = board.get_piece(front_left)
-                {
+                if board.has_piece_with_color_at(front_left, Color::White) {
                     positions.push(front_left);
                 }
             }
 
             if let Some(front_right) = from.add_offset(-1, -1) {
-                if let Some(Piece {
-                    color: Color::White,
-                    ..
-                }) = board.get_piece(front_right)
-                {
+                if board.has_piece_with_color_at(front_right, Color::White) {
                     positions.push(front_right);
                 }
             }
