@@ -12,19 +12,39 @@ impl Board {
         Self { grid }
     }
 
-    pub fn get_piece(&self, pos: Position) -> &Option<Piece> {
-        &self[pos]
+    /// Returns the `Piece` at `pos`, or `None` if there is no piece there.
+    ///
+    /// ## Example
+    /// ```rust
+    /// # use chess::prelude::*;
+    /// let board = Board::default();
+    /// assert_eq!(board.get_piece(E1).unwrap(), Piece::new(Color::White, PieceType::King));
+    /// ```
+    pub fn get_piece(&self, pos: Position) -> Option<Piece> {
+        self[pos]
     }
 
-    pub fn set_piece(&mut self, pos: Position, piece: Piece) {
-        self[pos] = Some(piece);
+    pub fn set_piece(&mut self, pos: Position, piece: Piece) -> Option<Piece> {
+        self[pos].replace(piece)
     }
 
+    pub fn take_piece(&mut self, pos: Position) -> Option<Piece> {
+        self[pos].take()
+    }
+
+    /// Returns `true` if there is a piece at `pos`.
+    ///
+    /// ## Example
+    /// ```rust
+    /// # use chess::{consts::*, Board, Color};
+    /// let board = Board::default();
+    /// assert!(board.has_piece_at(E2));
+    /// ```
     pub fn has_piece_at(&self, pos: Position) -> bool {
         self.get_piece(pos).is_some()
     }
 
-    pub fn has_piece_with_color_at(&self, pos: Position, color: Color) -> bool {
+    pub(crate) fn has_piece_with_color_at(&self, pos: Position, color: Color) -> bool {
         self.get_piece(pos)
             .map(|p| p.color() == color)
             .unwrap_or(false)

@@ -2,13 +2,17 @@
 pub use board::Board;
 pub use piece::Piece;
 use simple_grid::GridIndex;
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::{Debug, Display},
+};
 
 mod board;
 mod chess_move;
-mod consts;
+pub mod consts;
 mod game;
 mod piece;
+pub mod prelude;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Color {
@@ -57,6 +61,22 @@ impl TryFrom<u32> for Rank {
     }
 }
 
+impl Display for Rank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = match self {
+            Rank::First => "1",
+            Rank::Second => "2",
+            Rank::Third => "3",
+            Rank::Fourth => "4",
+            Rank::Fifth => "5",
+            Rank::Sixth => "6",
+            Rank::Seventh => "7",
+            Rank::Eighth => "8",
+        };
+        write!(f, "{}", output)
+    }
+}
+
 impl From<Rank> for u32 {
     fn from(rank: Rank) -> Self {
         use Rank::*;
@@ -95,6 +115,22 @@ impl File {
     }
 }
 
+impl Display for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = match self {
+            File::A => "A",
+            File::B => "B",
+            File::C => "C",
+            File::D => "D",
+            File::E => "E",
+            File::F => "F",
+            File::G => "G",
+            File::H => "H",
+        };
+        write!(f, "{}", output)
+    }
+}
+
 impl TryFrom<u32> for File {
     type Error = ();
 
@@ -129,7 +165,8 @@ impl From<File> for u32 {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+
+#[derive(Clone, Copy, PartialEq)]
 pub struct Position(File, Rank);
 
 impl Position {
@@ -154,6 +191,12 @@ impl Position {
 
     pub(crate) fn all_iter() -> impl Iterator<Item = Self> {
         consts::increasing_order()
+    }
+}
+
+impl Debug for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.file(), self.rank())
     }
 }
 

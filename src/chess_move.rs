@@ -1,7 +1,7 @@
 use crate::{board::Board, game::Game, piece::PieceType, Color, Piece, Position, Rank};
 use std::option::Option;
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum ChessMove {
     Regular {
         from: Position,
@@ -10,6 +10,7 @@ pub enum ChessMove {
     EnPassant {
         from: Position,
         to: Position,
+        taken_index: Position,
     },
     Promotion {
         from: Position,
@@ -25,10 +26,32 @@ pub enum ChessMove {
 }
 
 impl ChessMove {
+    pub(crate) fn from(&self) -> Position {
+        *match self {
+            ChessMove::Regular { from, to } => from,
+            ChessMove::EnPassant {
+                from,
+                to,
+                taken_index,
+            } => from,
+            ChessMove::Promotion { from, to, piece } => from,
+            ChessMove::Castle {
+                rook_from,
+                rook_to,
+                king_from,
+                king_to,
+            } => king_from,
+        }
+    }
+
     pub(crate) fn to(&self) -> Position {
         *match self {
             ChessMove::Regular { from: _, to } => to,
-            ChessMove::EnPassant { from: _, to } => to,
+            ChessMove::EnPassant {
+                from: _,
+                to,
+                taken_index,
+            } => to,
             ChessMove::Promotion {
                 from: _,
                 to,
@@ -44,7 +67,7 @@ impl ChessMove {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PromotionPiece {
     Knight,
     Bishop,
@@ -52,16 +75,71 @@ pub enum PromotionPiece {
     Queen,
 }
 
-pub(crate) struct MoveManager;
+pub(crate) struct MoveManager {
+    history: Vec<(ChessMove, Option<Piece>)>,
+    legal_moves: Vec<ChessMove>,
+}
 
 impl MoveManager {
-    pub fn get_legal_moves(&self, game: &Game) -> Vec<ChessMove> {
-        let player = game.current_player();
-        let board = game.board();
+    pub(crate) fn new(board: &Board, player: Color) -> Self {
+        let mut this = Self {
+            history: vec![],
+            legal_moves: vec![],
+        };
 
+        this.legal_moves = this.evaluate_legal_moves(board, player);
+
+        this
+    }
+
+    pub(crate) fn is_legal(&self, chess_move: ChessMove) -> bool {
+        self.legal_moves.contains(&chess_move)
+    }
+
+    pub(crate) fn make_move(&mut self, board: &mut Board, chess_move: ChessMove) -> Option<Piece> {
+        let taken_piece;
+        match chess_move {
+            ChessMove::Regular { from, to } => {
+                let piece = board.take_piece(from).unwrap();
+                let taken = board.set_piece(to, piece);
+                self.history.push((chess_move, taken));
+                taken_piece = taken;
+            }
+            ChessMove::EnPassant {
+                from,
+                to,
+                taken_index,
+            } => {
+                let piece = board.take_piece(from).unwrap();
+                board.set_piece(to, piece);
+                let taken = board.take_piece(taken_index).unwrap();
+                self.history.push((chess_move, Some(taken)));
+                taken_piece = Some(taken);
+            }
+            ChessMove::Promotion { from, to, piece } => {
+                todo!()
+            }
+            ChessMove::Castle {
+                rook_from,
+                rook_to,
+                king_from,
+                king_to,
+            } => {
+                todo!()
+            }
+        }
+        self.legal_moves.clear();
+        taken_piece
+    }
+
+    pub fn get_legal_moves(&self) -> &Vec<ChessMove> {
+        &self.legal_moves
+    }
+
+    pub(crate) fn evaluate_legal_moves(&self, board: &Board, player: Color) -> Vec<ChessMove> {
         let mut legal_moves = Vec::new();
         for pos in Position::all_iter() {
-            let mut legal_moves_from_pos = self.get_legal_moves_from(board, pos, player);
+            let mut legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
@@ -70,40 +148,49 @@ impl MoveManager {
         legal_moves
     }
 
-    fn get_legal_moves_from(&self, board: &Board, from: Position, player: Color) -> Vec<ChessMove> {
+    fn evaluate_legal_moves_from(
+        &self,
+        board: &Board,
+        from: Position,
+        player: Color,
+    ) -> Vec<ChessMove> {
         if let Some(piece) = board[from] {
             if piece.color() == player {
                 return match piece.kind() {
-                    PieceType::Pawn => self.get_legal_pawn_moves_from(board, from, player),
-                    PieceType::Knight => self.get_legal_knight_moves_from(board, from, player),
-                    PieceType::Bishop => self.get_legal_bishop_moves_from(board, from, player),
-                    PieceType::Rook => self.get_legal_rook_moves_from(board, from, player),
-                    PieceType::Queen => self.get_legal_queen_moves_from(board, from, player),
-                    PieceType::King => self.get_legal_king_moves_from(board, from, player),
+                    PieceType::Pawn => self.evaluate_legal_pawn_moves_from(board, from, player),
+                    PieceType::Knight => self.evaluate_legal_knight_moves_from(board, from, player),
+                    PieceType::Bishop => self.evaluate_legal_bishop_moves_from(board, from, player),
+                    PieceType::Rook => self.evaluate_legal_rook_moves_from(board, from, player),
+                    PieceType::Queen => self.evaluate_legal_queen_moves_from(board, from, player),
+                    PieceType::King => self.evaluate_legal_king_moves_from(board, from, player),
                 };
             }
         }
         Vec::new()
     }
 
-    fn get_legal_pawn_moves_from(
+    fn evaluate_legal_pawn_moves_from(
         &self,
         board: &Board,
         from: Position,
         player: Color,
     ) -> Vec<ChessMove> {
+        if from.rank() == Rank::First || from.rank() == Rank::Eighth {
+            // TODO: mark this as an error somehow?
+            // There should never be a pawn on the first or eighthranks.
+            return Vec::new();
+        }
         match player {
-            Color::Black => self.get_legal_black_pawn_moves_from(board, from),
-            Color::White => self.get_legal_white_pawn_moves_from(board, from),
+            Color::Black => self.evaluate_legal_black_pawn_moves_from(board, from),
+            Color::White => self.evaluate_legal_white_pawn_moves_from(board, from),
         }
     }
 
-    fn get_legal_white_pawn_moves_from(&self, board: &Board, from: Position) -> Vec<ChessMove> {
-        if from.rank() == Rank::First || from.rank() == Rank::Eighth {
-            // TODO: mark this as an error somehow?
-            return Vec::new();
-        }
-
+    fn evaluate_legal_white_pawn_moves_from(
+        &self,
+        board: &Board,
+        from: Position,
+    ) -> Vec<ChessMove> {
         if from.rank() == Rank::Seventh {
             // from here it's only possible to promote
             todo!()
@@ -147,12 +234,11 @@ impl MoveManager {
         }
     }
 
-    fn get_legal_black_pawn_moves_from(&self, board: &Board, from: Position) -> Vec<ChessMove> {
-        if from.rank() == Rank::First || from.rank() == Rank::Eighth {
-            // TODO: mark this as an error somehow?
-            return Vec::new();
-        }
-
+    fn evaluate_legal_black_pawn_moves_from(
+        &self,
+        board: &Board,
+        from: Position,
+    ) -> Vec<ChessMove> {
         if from.rank() == Rank::Second {
             // from here it's only possible to promote
             todo!()
@@ -196,7 +282,7 @@ impl MoveManager {
         }
     }
 
-    fn get_legal_king_moves_from(
+    fn evaluate_legal_king_moves_from(
         &self,
         board: &Board,
         from: Position,
@@ -239,7 +325,7 @@ impl MoveManager {
         legal_moves
     }
 
-    fn get_legal_knight_moves_from(
+    fn evaluate_legal_knight_moves_from(
         &self,
         board: &Board,
         from: Position,
@@ -280,7 +366,7 @@ impl MoveManager {
         legal_moves
     }
 
-    fn get_legal_bishop_moves_from(
+    fn evaluate_legal_bishop_moves_from(
         &self,
         board: &Board,
         from: Position,
@@ -308,7 +394,7 @@ impl MoveManager {
         legal_moves
     }
 
-    fn get_legal_rook_moves_from(
+    fn evaluate_legal_rook_moves_from(
         &self,
         board: &Board,
         from: Position,
@@ -336,7 +422,7 @@ impl MoveManager {
         legal_moves
     }
 
-    fn get_legal_queen_moves_from(
+    fn evaluate_legal_queen_moves_from(
         &self,
         board: &Board,
         from: Position,
@@ -414,19 +500,57 @@ mod tests {
     use Color::*;
 
     #[test]
-    fn bishop_moves() {
-        let manager = MoveManager;
+    fn legal_moves() {
         let board = Board::default();
+        let manager = MoveManager::new(&board, White);
+
+        let legal_moves: Vec<_> = manager
+            .get_legal_moves()
+            .iter()
+            .map(|m| (m.from(), m.to()))
+            .collect();
+
+        assert_eq!(
+            legal_moves,
+            vec![
+                (A2, A3),
+                (A2, A4),
+                (B1, C3),
+                (B1, A3),
+                (B2, B3),
+                (B2, B4),
+                (C2, C3),
+                (C2, C4),
+                (D2, D3),
+                (D2, D4),
+                (E2, E3),
+                (E2, E4),
+                (F2, F3),
+                (F2, F4),
+                (G1, H3),
+                (G1, F3),
+                (G2, G3),
+                (G2, G4),
+                (H2, H3),
+                (H2, H4)
+            ]
+        );
+    }
+
+    #[test]
+    fn bishop_moves() {
+        let board = Board::default();
+        let manager = MoveManager::new(&board, White);
 
         let bishop_moves_from_f4: Vec<Position> = manager
-            .get_legal_bishop_moves_from(&board, F4, White)
+            .evaluate_legal_bishop_moves_from(&board, F4, White)
             .iter()
             .map(|m| m.to())
             .collect();
         assert_eq!(bishop_moves_from_f4, vec![G5, H6, G3, E5, D6, C7, E3]);
 
         let bishop_moves_from_c1: Vec<Position> = manager
-            .get_legal_bishop_moves_from(&board, C1, White)
+            .evaluate_legal_bishop_moves_from(&board, C1, White)
             .iter()
             .map(|m| m.to())
             .collect();
@@ -435,11 +559,11 @@ mod tests {
 
     #[test]
     fn rook_moves() {
-        let manager = MoveManager;
         let board = Board::default();
+        let manager = MoveManager::new(&board, White);
 
         let rook_moves_from_c5: Vec<Position> = manager
-            .get_legal_rook_moves_from(&board, C5, Black)
+            .evaluate_legal_rook_moves_from(&board, C5, Black)
             .iter()
             .map(|m| m.to())
             .collect();
@@ -451,18 +575,18 @@ mod tests {
 
     #[test]
     fn knight_moves() {
-        let manager = MoveManager;
         let board = Board::default();
+        let manager = MoveManager::new(&board, White);
 
         let knight_moves_from_g4: Vec<Position> = manager
-            .get_legal_knight_moves_from(&board, G4, White)
+            .evaluate_legal_knight_moves_from(&board, G4, White)
             .iter()
             .map(|m| m.to())
             .collect();
         assert_eq!(knight_moves_from_g4, vec![H6, F6, E5, E3]);
 
         let knight_moves_from_d4: Vec<Position> = manager
-            .get_legal_knight_moves_from(&board, D4, White)
+            .evaluate_legal_knight_moves_from(&board, D4, White)
             .iter()
             .map(|m| m.to())
             .collect();
@@ -471,11 +595,11 @@ mod tests {
 
     #[test]
     fn queen_moves() {
-        let manager = MoveManager;
         let board = Board::default();
+        let manager = MoveManager::new(&board, White);
 
         let king_moves_from_a4: Vec<Position> = manager
-            .get_legal_king_moves_from(&board, A4, White)
+            .evaluate_legal_king_moves_from(&board, A4, White)
             .iter()
             .map(|m| m.to())
             .collect();
