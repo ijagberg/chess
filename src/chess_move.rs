@@ -87,7 +87,7 @@ impl MoveManager {
             legal_moves: vec![],
         };
 
-        this.legal_moves = this.evaluate_legal_moves(board, player);
+        this.evaluate_legal_moves(board, player);
 
         this
     }
@@ -129,6 +129,7 @@ impl MoveManager {
             }
         }
         self.legal_moves.clear();
+        dbg!("made move", chess_move, taken_piece);
         taken_piece
     }
 
@@ -136,7 +137,7 @@ impl MoveManager {
         &self.legal_moves
     }
 
-    pub(crate) fn evaluate_legal_moves(&self, board: &Board, player: Color) -> Vec<ChessMove> {
+    pub(crate) fn evaluate_legal_moves(&mut self, board: &Board, player: Color) {
         let mut legal_moves = Vec::new();
         for pos in Position::all_iter() {
             let mut legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
@@ -145,7 +146,9 @@ impl MoveManager {
 
         // TODO: for each move, check if it puts the player in check and remove if so
 
-        legal_moves
+        dbg!("evaluated legal moves", &player, &legal_moves);
+
+        self.legal_moves = legal_moves;
     }
 
     fn evaluate_legal_moves_from(

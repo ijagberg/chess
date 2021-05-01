@@ -20,6 +20,15 @@ pub enum Color {
     White,
 }
 
+impl Color {
+    pub fn opponent(&self) -> Self {
+        match self {
+            Color::Black => Color::White,
+            Color::White => Color::Black,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rank {
     First,
