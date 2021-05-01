@@ -1,4 +1,4 @@
-use crate::{consts::*, Piece, Position};
+use crate::{consts::*, Color, Piece, Position};
 use simple_grid::Grid;
 use std::ops::{Index, IndexMut};
 
@@ -22,6 +22,12 @@ impl Board {
 
     pub fn has_piece_at(&self, pos: Position) -> bool {
         self.get_piece(pos).is_some()
+    }
+
+    pub fn has_piece_with_color_at(&self, pos: Position, color: Color) -> bool {
+        self.get_piece(pos)
+            .map(|p| p.color() == color)
+            .unwrap_or(false)
     }
 }
 

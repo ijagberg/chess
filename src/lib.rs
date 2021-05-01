@@ -1,10 +1,8 @@
+#![allow(unused)]
 pub use board::Board;
 pub use piece::Piece;
-use simple_grid::{Grid, GridIndex};
-use std::{
-    convert::{TryFrom, TryInto},
-    ops::{Index, IndexMut},
-};
+use simple_grid::GridIndex;
+use std::convert::{TryFrom, TryInto};
 
 mod board;
 mod chess_move;
@@ -154,7 +152,7 @@ impl Position {
         ))
     }
 
-    pub fn all_iter() -> impl Iterator<Item = Self> {
+    pub(crate) fn all_iter() -> impl Iterator<Item = Self> {
         consts::increasing_order()
     }
 }

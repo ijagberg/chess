@@ -2,8 +2,8 @@ use crate::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Piece {
-    color: Color,
-    kind: PieceType,
+    pub(crate) color: Color,
+    pub(crate) kind: PieceType,
 }
 
 impl Piece {
