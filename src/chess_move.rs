@@ -1,5 +1,30 @@
-use crate::{board::Board, game::Game, piece::PieceType, Color, Piece, Position, Rank};
+use crate::{
+    board::Board, consts::INCREASING_ORDER, game::Game, piece::PieceType, Color, Piece, Position,
+    Rank,
+};
 use std::option::Option;
+
+const KNIGHT_OFFSETS: [(i32, i32); 8] = [
+    (2, 1),
+    (2, -1),
+    (1, 2),
+    (-1, 2),
+    (-2, 1),
+    (-2, -1),
+    (1, -2),
+    (-1, -2),
+];
+
+const KING_OFFSETS: [(i32, i32); 8] = [
+    (0, 1),
+    (1, 1),
+    (1, 0),
+    (1, -1),
+    (0, -1),
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+];
 
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub enum ChessMove {
@@ -78,13 +103,35 @@ pub enum PromotionPiece {
 pub(crate) struct MoveManager {
     history: Vec<(ChessMove, Option<Piece>)>,
     legal_moves: Vec<ChessMove>,
+    black_king: Position,
+    white_king: Position,
 }
 
 impl MoveManager {
     pub(crate) fn new(board: &Board, player: Color) -> Self {
+        let mut white_king = None;
+        let mut black_king = None;
+        for &pos in &INCREASING_ORDER {
+            if let Some(Piece {
+                color,
+                kind: PieceType::King,
+            }) = board[pos]
+            {
+                match color {
+                    Color::Black => {
+                        black_king = Some(pos);
+                    }
+                    Color::White => {
+                        white_king = Some(pos);
+                    }
+                }
+            }
+        }
         let mut this = Self {
             history: vec![],
             legal_moves: vec![],
+            black_king: black_king.expect("no black king on board"),
+            white_king: white_king.expect("no white king on board"),
         };
 
         this.evaluate_legal_moves(board, player);
@@ -102,6 +149,20 @@ impl MoveManager {
             ChessMove::Regular { from, to } => {
                 let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
+                if let Piece {
+                    color,
+                    kind: PieceType::King,
+                } = piece
+                {
+                    match color {
+                        Color::Black => {
+                            self.black_king = to;
+                        }
+                        Color::White => {
+                            self.white_king = to;
+                        }
+                    }
+                }
                 taken_piece = taken;
             }
             ChessMove::EnPassant {
@@ -123,12 +184,12 @@ impl MoveManager {
                 king_from,
                 king_to,
             } => {
+                // dont forget to update king pos
                 todo!()
             }
         }
         self.history.push((chess_move, taken_piece));
         self.legal_moves.clear();
-        dbg!("made move", chess_move, taken_piece);
         taken_piece
     }
 
@@ -143,15 +204,205 @@ impl MoveManager {
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
-        // TODO: for each move, check if it puts the player in check and remove if so
+        let mut actual_legal_moves = Vec::new();
+        for &m in &legal_moves {
+            let mut board = board.clone();
+            self.make_move(&mut board, m);
+            if !self.is_in_check(&board, player) {
+                actual_legal_moves.push(m);
+            }
+        }
 
-        dbg!("evaluated legal moves", &player, &legal_moves);
-
-        self.legal_moves = legal_moves;
+        self.legal_moves = actual_legal_moves;
     }
 
     fn previous_move(&self) -> Option<ChessMove> {
         self.history.last().map(|(m, p)| m).copied()
+    }
+
+    fn is_in_check(&self, board: &Board, player: Color) -> bool {
+        match player {
+            Color::Black => {
+                if let Some((pos, piece)) =
+                    self.is_under_attack(board, self.black_king, Color::Black)
+                {
+                    println!("{} is in check by {:?} on {:?}", player, piece, pos);
+                    return true;
+                }
+                false
+            }
+            Color::White => {
+                if let Some((pos, piece)) =
+                    self.is_under_attack(board, self.white_king, Color::White)
+                {
+                    println!("{} is in check by {:?} on {:?}", player, piece, pos);
+                    return true;
+                }
+                false
+            }
+        }
+    }
+
+    fn is_under_attack(
+        &self,
+        board: &Board,
+        target: Position,
+        color: Color,
+    ) -> Option<(Position, Piece)> {
+        use Color::*;
+        use PieceType::*;
+
+        // cardinal directions
+        {
+            let is_cardinal_checker = |pos: Option<Position>| {
+                if let Some(pos) = pos {
+                    if let Some(piece) = board[pos] {
+                        if piece.color() == color.opponent() && matches!(piece.kind(), Queen | Rook)
+                        {
+                            return Some((pos, piece));
+                        }
+                    }
+                }
+                return None;
+            };
+
+            let up_file = self
+                .step_until_collision(target, 1, 0, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_cardinal_checker(up_file) {
+                return Some(checker);
+            }
+
+            let down_file = self
+                .step_until_collision(target, -1, 0, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_cardinal_checker(down_file) {
+                return Some(checker);
+            }
+
+            let up_rank = self
+                .step_until_collision(target, 0, 1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_cardinal_checker(up_rank) {
+                return Some(checker);
+            }
+
+            let down_rank = self
+                .step_until_collision(target, 0, -1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_cardinal_checker(down_rank) {
+                return Some(checker);
+            }
+        }
+
+        // diagonal directions
+        {
+            let is_diagonal_checker = |pos: Option<Position>| {
+                if let Some(pos) = pos {
+                    if let Some(piece) = board[pos] {
+                        if piece.color() == color.opponent()
+                            && matches!(piece.kind(), Queen | Bishop)
+                        {
+                            return Some((pos, piece));
+                        }
+                    }
+                }
+                return None;
+            };
+
+            let up_file_up_rank = self
+                .step_until_collision(target, 1, 1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_diagonal_checker(up_file_up_rank) {
+                return Some(checker);
+            }
+
+            let up_file_down_rank = self
+                .step_until_collision(target, 1, -1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_diagonal_checker(up_file_down_rank) {
+                return Some(checker);
+            }
+
+            let down_file_up_rank = self
+                .step_until_collision(target, -1, 1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_diagonal_checker(down_file_up_rank) {
+                return Some(checker);
+            }
+
+            let down_file_down_rank = self
+                .step_until_collision(target, -1, -1, board, color)
+                .last()
+                .copied();
+            if let Some(checker) = is_diagonal_checker(down_file_down_rank) {
+                return Some(checker);
+            }
+        }
+
+        // knight moves
+        {
+            let is_knight_checker =
+                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), Knight);
+            for pos in KNIGHT_OFFSETS
+                .iter()
+                .filter_map(|&(file_step, rank_step)| target.add_offset(file_step, rank_step))
+            {
+                if let Some(piece) = board[pos] {
+                    if is_knight_checker(piece) {
+                        return Some((pos, piece));
+                    }
+                }
+            }
+        }
+
+        // king moves
+        {
+            let is_king_checker =
+                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), King);
+
+            for pos in KING_OFFSETS
+                .iter()
+                .filter_map(|&(file_step, rank_step)| target.add_offset(file_step, rank_step))
+            {
+                if let Some(piece) = board[pos] {
+                    if is_king_checker(piece) {
+                        return Some((pos, piece));
+                    }
+                }
+            }
+        }
+
+        // pawn moves
+        {
+            let is_pawn_checker =
+                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), Pawn);
+
+            let offsets = match color {
+                Black => [(-1, -1), (1, -1)],
+                White => [(-1, 1), (1, 1)],
+            };
+
+            for pos in offsets
+                .iter()
+                .filter_map(|&(file_step, rank_step)| target.add_offset(file_step, rank_step))
+            {
+                if let Some(piece) = board[pos] {
+                    if is_pawn_checker(piece) {
+                        return Some((pos, piece));
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     fn evaluate_legal_moves_from(
@@ -322,16 +573,6 @@ impl MoveManager {
         from: Position,
         player: Color,
     ) -> Vec<ChessMove> {
-        const KING_OFFSETS: [(i32, i32); 8] = [
-            (0, 1),
-            (1, 1),
-            (1, 0),
-            (1, -1),
-            (0, -1),
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-        ];
         let mut positions = Vec::new();
         for to in KING_OFFSETS
             .iter()
@@ -365,16 +606,6 @@ impl MoveManager {
         from: Position,
         player: Color,
     ) -> Vec<ChessMove> {
-        const KNIGHT_OFFSETS: [(i32, i32); 8] = [
-            (2, 1),
-            (2, -1),
-            (1, 2),
-            (-1, 2),
-            (-2, 1),
-            (-2, -1),
-            (1, -2),
-            (-1, -2),
-        ];
         let mut positions = Vec::new();
         for to in KNIGHT_OFFSETS
             .iter()

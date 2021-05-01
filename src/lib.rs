@@ -29,6 +29,16 @@ impl Color {
     }
 }
 
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = match self {
+            Color::Black => "Black",
+            Color::White => "White",
+        };
+        write!(f, "{}", output)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rank {
     First,
@@ -199,7 +209,7 @@ impl Position {
     }
 
     pub(crate) fn all_iter() -> impl Iterator<Item = Self> {
-        consts::increasing_order()
+        consts::INCREASING_ORDER.iter().copied()
     }
 }
 

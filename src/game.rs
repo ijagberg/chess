@@ -34,7 +34,7 @@ impl Game {
 
     pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), ()> {
         if !self.move_manager.is_legal(chess_move) {
-            dbg!("illegal move", chess_move);
+            println!("illegal move: {:?}", chess_move);
             Err(())
         } else {
             self.move_manager.make_move(&mut self.board, chess_move);
@@ -84,6 +84,16 @@ mod tests {
         .unwrap();
     }
 
+    #[test]
+    fn checked() {
+        let mut game = setup_game_2();
+
+        assert!(game.make_move(regular(F2, F3)).is_err()); // this move would normally be allowed, but whites king is in check
+        game.make_move(regular(C2, C3)).unwrap(); // block the check
+        game.make_move(regular(F7, F6)).unwrap();
+        assert!(game.make_move(regular(C3, C4)).is_err()); // can't make this move because it would remove the block from earlier
+    }
+
     /// Set up a game where en passant is possible
     fn setup_game_1() -> Game {
         let mut game = Game::new();
@@ -91,6 +101,16 @@ mod tests {
         game.make_move(regular(H7, H6)).unwrap();
         game.make_move(regular(E4, E5)).unwrap();
         game.make_move(regular(D7, D5)).unwrap();
+        game
+    }
+
+    /// Set up a game where the white king is in check
+    fn setup_game_2() -> Game {
+        let mut game = Game::new();
+        game.make_move(regular(E2, E4)).unwrap();
+        game.make_move(regular(E7, E5)).unwrap();
+        game.make_move(regular(D2, D4)).unwrap();
+        game.make_move(regular(F8, B4)).unwrap();
         game
     }
 
