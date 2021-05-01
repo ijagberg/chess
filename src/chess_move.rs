@@ -102,7 +102,6 @@ impl MoveManager {
             ChessMove::Regular { from, to } => {
                 let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
-                self.history.push((chess_move, taken));
                 taken_piece = taken;
             }
             ChessMove::EnPassant {
@@ -113,7 +112,6 @@ impl MoveManager {
                 let piece = board.take_piece(from).unwrap();
                 board.set_piece(to, piece);
                 let taken = board.take_piece(taken_index).unwrap();
-                self.history.push((chess_move, Some(taken)));
                 taken_piece = Some(taken);
             }
             ChessMove::Promotion { from, to, piece } => {
@@ -128,6 +126,7 @@ impl MoveManager {
                 todo!()
             }
         }
+        self.history.push((chess_move, taken_piece));
         self.legal_moves.clear();
         dbg!("made move", chess_move, taken_piece);
         taken_piece
@@ -149,6 +148,10 @@ impl MoveManager {
         dbg!("evaluated legal moves", &player, &legal_moves);
 
         self.legal_moves = legal_moves;
+    }
+
+    fn previous_move(&self) -> Option<ChessMove> {
+        self.history.last().map(|(m, p)| m).copied()
     }
 
     fn evaluate_legal_moves_from(
@@ -224,14 +227,28 @@ impl MoveManager {
                 }
             }
 
-            if from.rank() == Rank::Fifth {
-                // holy hell
-            }
-
-            let legal_moves = positions
+            let mut legal_moves: Vec<ChessMove> = positions
                 .into_iter()
                 .map(|to| ChessMove::Regular { from, to })
                 .collect();
+
+            if from.rank() == Rank::Fifth {
+                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
+                    let left_file = from.file().add_offset(-1);
+                    let right_file = from.file().add_offset(1);
+                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
+                        if f == Position::new(file, Rank::Seventh)
+                            && t == Position::new(file, Rank::Fifth)
+                        {
+                            legal_moves.push(ChessMove::EnPassant {
+                                from,
+                                to: Position::new(file, Rank::Sixth),
+                                taken_index: Position::new(file, Rank::Fifth),
+                            });
+                        }
+                    }
+                }
+            }
 
             legal_moves
         }
@@ -272,14 +289,28 @@ impl MoveManager {
                 }
             }
 
-            if from.rank() == Rank::Fourth {
-                // en passant
-            }
-
-            let legal_moves = positions
+            let mut legal_moves: Vec<ChessMove> = positions
                 .into_iter()
                 .map(|to| ChessMove::Regular { from, to })
                 .collect();
+
+            if from.rank() == Rank::Fourth {
+                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
+                    let left_file = from.file().add_offset(-1);
+                    let right_file = from.file().add_offset(1);
+                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
+                        if f == Position::new(file, Rank::Second)
+                            && t == Position::new(file, Rank::Fourth)
+                        {
+                            legal_moves.push(ChessMove::EnPassant {
+                                from,
+                                to: Position::new(file, Rank::Third),
+                                taken_index: Position::new(file, Rank::Fourth),
+                            });
+                        }
+                    }
+                }
+            }
 
             legal_moves
         }

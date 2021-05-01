@@ -49,8 +49,8 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::Color::*;
+    use crate::{prelude::*, Position};
 
     #[test]
     fn make_move() {
@@ -70,5 +70,31 @@ mod tests {
 
         let illegal_move = ChessMove::Regular { from: H7, to: H6 };
         assert!(game.make_move(illegal_move).is_err());
+    }
+
+    #[test]
+    fn en_passant() {
+        let mut game = setup_game_1();
+
+        game.make_move(ChessMove::EnPassant {
+            from: E5,
+            to: D6,
+            taken_index: D5,
+        })
+        .unwrap();
+    }
+
+    /// Set up a game where en passant is possible
+    fn setup_game_1() -> Game {
+        let mut game = Game::new();
+        game.make_move(regular(E2, E4)).unwrap();
+        game.make_move(regular(H7, H6)).unwrap();
+        game.make_move(regular(E4, E5)).unwrap();
+        game.make_move(regular(D7, D5)).unwrap();
+        game
+    }
+
+    fn regular(from: Position, to: Position) -> ChessMove {
+        ChessMove::Regular { from, to }
     }
 }
