@@ -1,4 +1,5 @@
 pub use crate::board::Board;
+pub use crate::chess_move::ChessMove;
 pub use crate::consts::*;
 pub use crate::game::Game;
 pub use crate::piece::Piece;
