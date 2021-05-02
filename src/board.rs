@@ -1,6 +1,10 @@
-use crate::{consts::*, Color, Piece, Position};
+use crate::{consts::*, Color, File, Piece, Position, Rank};
 use simple_grid::Grid;
-use std::ops::{Index, IndexMut};
+use std::{
+    collections::HashSet,
+    convert::TryFrom,
+    ops::{Index, IndexMut},
+};
 
 #[derive(Debug, Clone)]
 pub struct Board {
@@ -112,4 +116,38 @@ impl IndexMut<Position> for Board {
     fn index_mut(&mut self, index: Position) -> &mut Self::Output {
         &mut self.grid[index]
     }
+}
+
+pub(crate) fn get_perspective(board: &Board, highlighted_squares: &HashSet<Position>) -> String {
+    let mut lines = Vec::new();
+
+    for rank in (1..=8).rev().map(|r| Rank::try_from(r).unwrap()) {
+        let mut pieces = Vec::new();
+        for file in (1..=8).map(|f| File::try_from(f).unwrap()) {
+            let index = Position::new(file, rank);
+            let highlight = match highlighted_squares.contains(&index) {
+                true => "X",
+                false => " ",
+            };
+            let piece = match board[index] {
+                Some(p) => format!("{}", p),
+                None => " ".to_string(),
+            };
+            let output = format!("{}{} ", highlight, piece);
+
+            pieces.push(output);
+        }
+
+        let mut line = format!("{}│", rank);
+        line.push_str(&pieces.join("│"));
+        line.push_str("│\n");
+
+        lines.push(line);
+    }
+
+    let mut output = String::new();
+    output.push_str(" ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
+    output.push_str(&lines.join(" ├───┼───┼───┼───┼───┼───┼───┼───┤\n"));
+    output.push_str(" └───┴───┴───┴───┴───┴───┴───┴───┘");
+    output
 }

@@ -50,8 +50,10 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
-    use crate::{chess_move::PromotionPiece, Color::*};
+    use crate::{board, chess_move::PromotionPiece, Color::*};
     use crate::{prelude::*, Position};
 
     #[test]
@@ -133,6 +135,58 @@ mod tests {
                 king_to: G1,
             })
             .is_err());
+    }
+
+    #[test]
+    fn immortal_game() {
+        let mut game = Game::new();
+        game.make_move(regular(E2, E4)).unwrap();
+        game.make_move(regular(E7, E5)).unwrap();
+        game.make_move(regular(F2, F4)).unwrap();
+        game.make_move(regular(E5, F4)).unwrap();
+        game.make_move(regular(F1, C4)).unwrap();
+        game.make_move(regular(D8, H4)).unwrap();
+        game.make_move(regular(E1, F1)).unwrap();
+        game.make_move(regular(B7, B5)).unwrap();
+        game.make_move(regular(C4, B5)).unwrap();
+        game.make_move(regular(G8, F6)).unwrap();
+        game.make_move(regular(G1, F3)).unwrap();
+        game.make_move(regular(H4, H6)).unwrap();
+        game.make_move(regular(D2, D3)).unwrap();
+        game.make_move(regular(F6, H5)).unwrap();
+        game.make_move(regular(F3, H4)).unwrap();
+        game.make_move(regular(H6, G5)).unwrap();
+        game.make_move(regular(H4, F5)).unwrap();
+        game.make_move(regular(C7, C6)).unwrap();
+        game.make_move(regular(G2, G4)).unwrap();
+        game.make_move(regular(H5, F6)).unwrap();
+        game.make_move(regular(H1, G1)).unwrap();
+        game.make_move(regular(C6, B5)).unwrap();
+        game.make_move(regular(H2, H4)).unwrap();
+        game.make_move(regular(G5, G6)).unwrap();
+        game.make_move(regular(H4, H5)).unwrap();
+        game.make_move(regular(G6, G5)).unwrap();
+        game.make_move(regular(D1, F3)).unwrap();
+        game.make_move(regular(F6, G8)).unwrap();
+        game.make_move(regular(C1, F4)).unwrap();
+        game.make_move(regular(G5, F6)).unwrap();
+        game.make_move(regular(B1, C3)).unwrap();
+        game.make_move(regular(F8, C5)).unwrap();
+        game.make_move(regular(C3, D5)).unwrap();
+        game.make_move(regular(F6, B2)).unwrap();
+        game.make_move(regular(F4, D6)).unwrap();
+        game.make_move(regular(C5, G1)).unwrap();
+        game.make_move(regular(E4, E5)).unwrap();
+        game.make_move(regular(B2, A1)).unwrap();
+        game.make_move(regular(F1, E2)).unwrap();
+        game.make_move(regular(B8, A6)).unwrap();
+        game.make_move(regular(F5, G7)).unwrap();
+        game.make_move(regular(E8, D8)).unwrap();
+        game.make_move(regular(F3, F6)).unwrap();
+        game.make_move(regular(G8, F6)).unwrap();
+        game.make_move(regular(D6, E7)).unwrap();
+        println!("{}", board::get_perspective(game.board(), &HashSet::new()));
+        assert!(game.move_manager.get_legal_moves().is_empty());
     }
 
     /// Set up a game where en passant is possible

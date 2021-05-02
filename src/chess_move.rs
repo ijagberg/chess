@@ -159,9 +159,7 @@ impl MoveManager {
         let taken_piece;
         match chess_move {
             ChessMove::Regular { from, to } => {
-                let piece = board
-                    .take_piece(from)
-                    .expect(&format!("error taking piece for move {:?}", chess_move));
+                let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
                 if let Piece {
                     color,
@@ -227,9 +225,13 @@ impl MoveManager {
         let mut actual_legal_moves = Vec::new();
         let mut board_clone = board.clone();
         for &legal_move in &legal_moves {
+            print!("testing move: {}, {:?}", player, legal_move);
             self.make_move(&mut board_clone, player, legal_move);
             if !self.is_in_check(&board_clone, player) {
+                println!(" LEGAL");
                 actual_legal_moves.push(legal_move);
+            } else {
+                println!(" ILLEGAL");
             }
             self.undo_last_move(&mut board_clone);
         }
@@ -249,6 +251,16 @@ impl MoveManager {
                 ChessMove::Regular { from, to } => {
                     let moved_piece = board.take_piece(to).unwrap();
                     board.set_piece(from, moved_piece);
+                    if moved_piece.kind() == PieceType::King {
+                        match player {
+                            Color::Black => {
+                                self.black_king = from;
+                            }
+                            Color::White => {
+                                self.white_king = from;
+                            }
+                        }
+                    }
                     set_option(board, to, taken_piece);
                 }
                 ChessMove::EnPassant {
@@ -300,6 +312,7 @@ impl MoveManager {
                 if let Some((pos, piece)) =
                     self.is_under_attack(board, self.black_king, Color::Black)
                 {
+                    println!("black is in check by {:?} on {:?}", piece, pos);
                     return true;
                 }
                 false
@@ -308,6 +321,7 @@ impl MoveManager {
                 if let Some((pos, piece)) =
                     self.is_under_attack(board, self.white_king, Color::White)
                 {
+                    println!("white is in check by {:?} on {:?}", piece, pos);
                     return true;
                 }
                 false
