@@ -34,9 +34,23 @@ impl Game {
         self.move_manager.get_legal_moves()
     }
 
-    pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), ()> {
-        if !self.move_manager.is_legal(chess_move) {
-            Err(())
+    pub fn is_over(&self) -> bool {
+        self.move_manager.get_legal_moves().is_empty()
+    }
+
+    pub fn winner(&self) -> Option<Color> {
+        if self.is_over() {
+            Some(self.current_player.opponent())
+        } else {
+            None
+        }
+    }
+
+    pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), &'static str> {
+        if self.is_over() {
+            Err("game is over")
+        } else if !self.move_manager.is_legal(chess_move) {
+            Err("illegal move")
         } else {
             self.move_manager
                 .make_move(&mut self.board, self.current_player, chess_move);
@@ -185,8 +199,60 @@ mod tests {
         game.make_move(regular(F3, F6)).unwrap();
         game.make_move(regular(G8, F6)).unwrap();
         game.make_move(regular(D6, E7)).unwrap();
-        println!("{}", board::get_perspective(game.board(), &HashSet::new()));
-        assert!(game.move_manager.get_legal_moves().is_empty());
+        assert_eq!(game.winner(), Some(Color::White));
+    }
+
+    #[test]
+    fn wiede_vs_alphonse_goetz() {
+        // https://www.chessgames.com/perl/chessgame?gid=1075778
+        let mut game = Game::new();
+        game.make_move(regular(E2, E4)).unwrap();
+        game.make_move(regular(E7, E5)).unwrap();
+        game.make_move(regular(F2, F4)).unwrap();
+        game.make_move(regular(E5, F4)).unwrap();
+        game.make_move(regular(B2, B3)).unwrap();
+        game.make_move(regular(D8, H4)).unwrap();
+        game.make_move(regular(G2, G3)).unwrap();
+        game.make_move(regular(F4, G3)).unwrap();
+        game.make_move(regular(H2, H3)).unwrap();
+        game.make_move(regular(G3, G2)).unwrap();
+        game.make_move(regular(E1, E2)).unwrap();
+        game.make_move(regular(H4, E4)).unwrap();
+        game.make_move(regular(E2, F2)).unwrap();
+        game.make_move(ChessMove::Promotion {
+            from: G2,
+            to: H1,
+            piece: PromotionPiece::Knight,
+        })
+        .unwrap();
+        assert_eq!(game.winner(), Some(Color::Black));
+    }
+
+    #[test]
+    fn heinrich_lohmann_vs_rudolf_teschner() {
+        // https://www.chessgames.com/perl/chessgame?gid=1250788
+        let mut game = Game::new();
+        game.make_move(regular(E2, E4)).unwrap();
+        game.make_move(regular(E7, E6)).unwrap();
+        game.make_move(regular(D2, D4)).unwrap();
+        game.make_move(regular(D7, D5)).unwrap();
+        game.make_move(regular(B1, C3)).unwrap();
+        game.make_move(regular(D5, E4)).unwrap();
+        game.make_move(regular(C3, E4)).unwrap();
+        game.make_move(regular(B8, D7)).unwrap();
+        game.make_move(regular(G1, F3)).unwrap();
+        game.make_move(regular(G8, F6)).unwrap();
+        game.make_move(regular(F3, G5)).unwrap();
+        game.make_move(regular(F8, E7)).unwrap();
+        game.make_move(regular(G5, F7)).unwrap();
+        game.make_move(regular(E8, F7)).unwrap();
+        game.make_move(regular(E4, G5)).unwrap();
+        game.make_move(regular(F7, G8)).unwrap();
+        game.make_move(regular(G5, E6)).unwrap();
+        game.make_move(regular(D8, E8)).unwrap();
+        game.make_move(regular(E6, C7)).unwrap();
+        game.make_move(regular(E7, B4)).unwrap();
+        assert_eq!(game.winner(), Some(Color::Black));
     }
 
     /// Set up a game where en passant is possible

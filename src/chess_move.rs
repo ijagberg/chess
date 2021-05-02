@@ -108,6 +108,17 @@ pub enum PromotionPiece {
     Queen,
 }
 
+impl PromotionPiece {
+    pub(crate) fn create_piece(&self, color: Color) -> Piece {
+        match self {
+            PromotionPiece::Knight => Piece::knight(color),
+            PromotionPiece::Bishop => Piece::bishop(color),
+            PromotionPiece::Rook => Piece::rook(color),
+            PromotionPiece::Queen => Piece::queen(color),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct MoveManager {
     history: Vec<(Color, ChessMove, Option<Piece>)>,
@@ -188,9 +199,13 @@ impl MoveManager {
                 let taken = board.take_piece(taken_index).unwrap();
                 taken_piece = Some(taken);
             }
-            ChessMove::Promotion { from, to, piece } => {
+            ChessMove::Promotion {
+                from,
+                to,
+                piece: promotion,
+            } => {
                 let piece = board.take_piece(from).unwrap();
-                let taken = board.set_piece(to, piece);
+                let taken = board.set_piece(to, promotion.create_piece(player));
                 taken_piece = taken;
             }
             ChessMove::Castle {
