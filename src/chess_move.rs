@@ -32,6 +32,7 @@ pub enum ChessMove {
     EnPassant {
         from: Position,
         to: Position,
+        taken_original_index: Position,
         taken_index: Position,
     },
     Promotion {
@@ -55,6 +56,7 @@ impl ChessMove {
                 from,
                 to,
                 taken_index,
+                taken_original_index,
             } => from,
             ChessMove::Promotion { from, to, piece } => from,
             ChessMove::Castle {
@@ -73,6 +75,7 @@ impl ChessMove {
                 from: _,
                 to,
                 taken_index,
+                taken_original_index,
             } => to,
             ChessMove::Promotion {
                 from: _,
@@ -105,15 +108,16 @@ pub enum PromotionPiece {
     Queen,
 }
 
+#[derive(Debug)]
 pub(crate) struct MoveManager {
-    history: Vec<(ChessMove, Option<Piece>)>,
+    history: Vec<(Color, ChessMove, Option<Piece>)>,
     legal_moves: Vec<ChessMove>,
     black_king: Position,
     white_king: Position,
 }
 
 impl MoveManager {
-    pub(crate) fn new(board: &Board, player: Color) -> Self {
+    pub(crate) fn new(board: &Board) -> Self {
         let mut white_king = None;
         let mut black_king = None;
         for &pos in &INCREASING_ORDER {
@@ -139,8 +143,6 @@ impl MoveManager {
             white_king: white_king.expect("no white king on board"),
         };
 
-        this.evaluate_legal_moves(board, player);
-
         this
     }
 
@@ -151,13 +153,15 @@ impl MoveManager {
     pub(crate) fn make_move(
         &mut self,
         board: &mut Board,
+        player: Color,
         chess_move: ChessMove,
-        dry_run: bool,
     ) -> Option<Piece> {
         let taken_piece;
         match chess_move {
             ChessMove::Regular { from, to } => {
-                let piece = board.take_piece(from).unwrap();
+                let piece = board
+                    .take_piece(from)
+                    .expect(&format!("error taking piece for move {:?}", chess_move));
                 let taken = board.set_piece(to, piece);
                 if let Piece {
                     color,
@@ -178,6 +182,7 @@ impl MoveManager {
             ChessMove::EnPassant {
                 from,
                 to,
+                taken_original_index,
                 taken_index,
             } => {
                 let piece = board.take_piece(from).unwrap();
@@ -204,10 +209,7 @@ impl MoveManager {
                 taken_piece = None;
             }
         }
-        if !dry_run {
-            self.history.push((chess_move, taken_piece));
-            self.legal_moves.clear();
-        }
+        self.history.push((player, chess_move, taken_piece));
         taken_piece
     }
 
@@ -223,19 +225,73 @@ impl MoveManager {
         }
 
         let mut actual_legal_moves = Vec::new();
-        for &m in &legal_moves {
-            let mut board = board.clone();
-            self.make_move(&mut board, m, true);
-            if !self.is_in_check(&board, player) {
-                actual_legal_moves.push(m);
+        let mut board_clone = board.clone();
+        for &legal_move in &legal_moves {
+            self.make_move(&mut board_clone, player, legal_move);
+            if !self.is_in_check(&board_clone, player) {
+                actual_legal_moves.push(legal_move);
             }
+            self.undo_last_move(&mut board_clone);
         }
 
         self.legal_moves = actual_legal_moves;
     }
 
+    fn undo_last_move(&mut self, board: &mut Board) {
+        fn set_option(board: &mut Board, pos: Position, piece: Option<Piece>) {
+            if let Some(piece) = piece {
+                board.set_piece(pos, piece);
+            }
+        }
+
+        if let Some((player, chess_move, taken_piece)) = self.history.pop() {
+            match chess_move {
+                ChessMove::Regular { from, to } => {
+                    let moved_piece = board.take_piece(to).unwrap();
+                    board.set_piece(from, moved_piece);
+                    set_option(board, to, taken_piece);
+                }
+                ChessMove::EnPassant {
+                    from,
+                    to,
+                    taken_index,
+                    taken_original_index,
+                } => {
+                    let moved_pawn = board.take_piece(to).unwrap();
+                    board.set_piece(from, moved_pawn);
+                    let taken_pawn = taken_piece.unwrap();
+                    board.set_piece(taken_original_index, taken_pawn);
+                }
+                ChessMove::Promotion { from, to, piece } => {
+                    let color = match from.rank() {
+                        Rank::Second => Color::Black,
+                        Rank::Seventh => Color::White,
+                        _ => panic!(),
+                    };
+                    board.set_piece(from, Piece::pawn(color));
+                    board.take_piece(to);
+                    set_option(board, to, taken_piece);
+                }
+                ChessMove::Castle {
+                    rook_from,
+                    rook_to,
+                    king_from,
+                    king_to,
+                } => {
+                    let king = board.take_piece(king_to).unwrap();
+                    let rook = board.take_piece(rook_to).unwrap();
+                    board.set_piece(king_from, king);
+                    board.set_piece(rook_from, rook);
+                }
+            }
+        }
+    }
+
     fn previous_move(&self) -> Option<ChessMove> {
-        self.history.last().map(|(m, p)| m).copied()
+        self.history
+            .last()
+            .map(|(_player, chess_move, _taken_piece)| chess_move)
+            .copied()
     }
 
     fn is_in_check(&self, board: &Board, player: Color) -> bool {
@@ -244,7 +300,6 @@ impl MoveManager {
                 if let Some((pos, piece)) =
                     self.is_under_attack(board, self.black_king, Color::Black)
                 {
-                    println!("{} is in check by {:?} on {:?}", player, piece, pos);
                     return true;
                 }
                 false
@@ -253,7 +308,6 @@ impl MoveManager {
                 if let Some((pos, piece)) =
                     self.is_under_attack(board, self.white_king, Color::White)
                 {
-                    println!("{} is in check by {:?} on {:?}", player, piece, pos);
                     return true;
                 }
                 false
@@ -531,6 +585,7 @@ impl MoveManager {
                                 from,
                                 to: Position::new(file, Rank::Sixth),
                                 taken_index: Position::new(file, Rank::Fifth),
+                                taken_original_index: Position::new(file, Rank::Seventh),
                             });
                         }
                     }
@@ -611,6 +666,7 @@ impl MoveManager {
                                 from,
                                 to: Position::new(file, Rank::Third),
                                 taken_index: Position::new(file, Rank::Fourth),
+                                taken_original_index: Position::new(file, Rank::Second),
                             });
                         }
                     }
@@ -659,21 +715,19 @@ impl MoveManager {
     }
 
     fn evaluate_white_castle(&self, board: &Board) -> Vec<ChessMove> {
-        println!("evaluating white castle");
         // has king moved?
-        if dbg!(self.history_contains_from_position(E1)) {
-            println!("white king has moved");
+        if self.history_contains_from_position(E1) {
             return Vec::new();
         }
 
         let mut moves = Vec::new();
 
         // check short castle
-        if dbg!(!self.history_contains_from_position(H1))
-            && dbg!(!board.has_piece_at(F1))
-            && dbg!(!board.has_piece_at(G1))
-            && dbg!(!self.is_under_attack(board, F1, Color::White).is_some())
-            && dbg!(!self.is_under_attack(board, G1, Color::White).is_some())
+        if !self.history_contains_from_position(H1)
+            && !board.has_piece_at(F1)
+            && !board.has_piece_at(G1)
+            && !self.is_under_attack(board, F1, Color::White).is_some()
+            && !self.is_under_attack(board, G1, Color::White).is_some()
         {
             moves.push(ChessMove::Castle {
                 rook_from: H1,
@@ -684,13 +738,13 @@ impl MoveManager {
         }
 
         // check long castle
-        if dbg!(!self.history_contains_from_position(A1))
-            && dbg!(!board.has_piece_at(D1))
-            && dbg!(!board.has_piece_at(C1))
-            && dbg!(!board.has_piece_at(B1))
-            && dbg!(!self.is_under_attack(board, D1, Color::White).is_some())
-            && dbg!(!self.is_under_attack(board, C1, Color::White).is_some())
-            && dbg!(!self.is_under_attack(board, B1, Color::White).is_some())
+        if !self.history_contains_from_position(A1)
+            && !board.has_piece_at(D1)
+            && !board.has_piece_at(C1)
+            && !board.has_piece_at(B1)
+            && !self.is_under_attack(board, D1, Color::White).is_some()
+            && !self.is_under_attack(board, C1, Color::White).is_some()
+            && !self.is_under_attack(board, B1, Color::White).is_some()
         {
             moves.push(ChessMove::Castle {
                 rook_from: A1,
@@ -704,7 +758,6 @@ impl MoveManager {
     }
 
     fn evaluate_black_castle(&self, board: &Board) -> Vec<ChessMove> {
-        println!("evaluating black castle");
         // has king moved?
         if self.history_contains_from_position(E8) {
             return Vec::new();
@@ -906,7 +959,9 @@ impl MoveManager {
 
     /// Check if the move history contains any move that was made *from* the given index.
     fn history_contains_from_position(&self, from: Position) -> bool {
-        self.history.iter().any(|(m, _)| m.from() == from)
+        self.history
+            .iter()
+            .any(|(_player, chess_move, _taken_piece)| chess_move.from() == from)
     }
 }
 
@@ -919,13 +974,18 @@ mod tests {
     #[test]
     fn legal_moves() {
         let board = Board::default();
-        let manager = MoveManager::new(&board, White);
+        let mut manager = MoveManager::new(&board);
+        manager.evaluate_legal_moves(&board, White);
+
+        dbg!(&manager);
 
         let legal_moves: Vec<_> = manager
             .get_legal_moves()
             .iter()
             .map(|m| (m.from(), m.to()))
             .collect();
+
+        dbg!(&legal_moves);
 
         assert_eq!(
             legal_moves,
@@ -957,7 +1017,7 @@ mod tests {
     #[test]
     fn bishop_moves() {
         let board = Board::default();
-        let manager = MoveManager::new(&board, White);
+        let manager = MoveManager::new(&board);
 
         let bishop_moves_from_f4: Vec<Position> = manager
             .evaluate_legal_bishop_moves_from(&board, F4, White)
@@ -977,7 +1037,7 @@ mod tests {
     #[test]
     fn rook_moves() {
         let board = Board::default();
-        let manager = MoveManager::new(&board, White);
+        let manager = MoveManager::new(&board);
 
         let rook_moves_from_c5: Vec<Position> = manager
             .evaluate_legal_rook_moves_from(&board, C5, Black)
@@ -993,7 +1053,7 @@ mod tests {
     #[test]
     fn knight_moves() {
         let board = Board::default();
-        let manager = MoveManager::new(&board, White);
+        let manager = MoveManager::new(&board);
 
         let knight_moves_from_g4: Vec<Position> = manager
             .evaluate_legal_knight_moves_from(&board, G4, White)
@@ -1013,7 +1073,7 @@ mod tests {
     #[test]
     fn queen_moves() {
         let board = Board::default();
-        let manager = MoveManager::new(&board, White);
+        let manager = MoveManager::new(&board);
 
         let king_moves_from_a4: Vec<Position> = manager
             .evaluate_legal_king_moves_from(&board, A4, White)

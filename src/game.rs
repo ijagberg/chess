@@ -13,9 +13,11 @@ impl Game {
     pub fn new() -> Self {
         let board = Board::default();
         let current_player = Color::White;
+        let mut move_manager = MoveManager::new(&board);
+        move_manager.evaluate_legal_moves(&board, current_player);
         Self {
             current_player,
-            move_manager: MoveManager::new(&board, current_player),
+            move_manager,
             board,
         }
     }
@@ -34,11 +36,10 @@ impl Game {
 
     pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), ()> {
         if !self.move_manager.is_legal(chess_move) {
-            println!("illegal move: {:?}", chess_move);
             Err(())
         } else {
-            println!("make move: {:?}", chess_move);
-            self.move_manager.make_move(&mut self.board, chess_move, false);
+            self.move_manager
+                .make_move(&mut self.board, self.current_player, chess_move);
             self.current_player = self.current_player.opponent();
             self.move_manager
                 .evaluate_legal_moves(&self.board, self.current_player);
@@ -81,6 +82,7 @@ mod tests {
             from: E5,
             to: D6,
             taken_index: D5,
+            taken_original_index: D7,
         })
         .unwrap();
     }
@@ -123,12 +125,14 @@ mod tests {
         game.make_move(regular(D2, D3)).unwrap();
         game.make_move(regular(G5, G2)).unwrap();
         // queen is checking F1 and G1, preventing castling
-        assert!(game.make_move(ChessMove::Castle {
-            rook_from: H1,
-            rook_to: F1,
-            king_from: E1,
-            king_to: G1,
-        }).is_err());
+        assert!(game
+            .make_move(ChessMove::Castle {
+                rook_from: H1,
+                rook_to: F1,
+                king_from: E1,
+                king_to: G1,
+            })
+            .is_err());
     }
 
     /// Set up a game where en passant is possible
