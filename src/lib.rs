@@ -39,7 +39,7 @@ impl Display for Color {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rank {
     First,
     Second,
@@ -112,7 +112,7 @@ impl From<Rank> for u32 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum File {
     A,
     B,
@@ -185,7 +185,7 @@ impl From<File> for u32 {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Position(File, Rank);
 
 impl Position {

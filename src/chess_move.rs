@@ -1,7 +1,4 @@
-use crate::{
-    board::Board, consts::INCREASING_ORDER, game::Game, piece::PieceType, Color, Piece, Position,
-    Rank,
-};
+use crate::{board::Board, consts::*, game::Game, piece::PieceType, Color, Piece, Position, Rank};
 use std::option::Option;
 
 const KNIGHT_OFFSETS: [(i32, i32); 8] = [
@@ -151,7 +148,12 @@ impl MoveManager {
         self.legal_moves.contains(&chess_move)
     }
 
-    pub(crate) fn make_move(&mut self, board: &mut Board, chess_move: ChessMove) -> Option<Piece> {
+    pub(crate) fn make_move(
+        &mut self,
+        board: &mut Board,
+        chess_move: ChessMove,
+        dry_run: bool,
+    ) -> Option<Piece> {
         let taken_piece;
         match chess_move {
             ChessMove::Regular { from, to } => {
@@ -195,11 +197,17 @@ impl MoveManager {
                 king_to,
             } => {
                 // dont forget to update king pos
-                todo!()
+                let rook = board.take_piece(rook_from).unwrap();
+                board.set_piece(rook_to, rook);
+                let king = board.take_piece(king_from).unwrap();
+                board.set_piece(king_to, king);
+                taken_piece = None;
             }
         }
-        self.history.push((chess_move, taken_piece));
-        self.legal_moves.clear();
+        if !dry_run {
+            self.history.push((chess_move, taken_piece));
+            self.legal_moves.clear();
+        }
         taken_piece
     }
 
@@ -217,7 +225,7 @@ impl MoveManager {
         let mut actual_legal_moves = Vec::new();
         for &m in &legal_moves {
             let mut board = board.clone();
-            self.make_move(&mut board, m);
+            self.make_move(&mut board, m, true);
             if !self.is_in_check(&board, player) {
                 actual_legal_moves.push(m);
             }
@@ -636,14 +644,107 @@ impl MoveManager {
             }
         }
 
-        // TODO: castling
-
-        let legal_moves = positions
+        let mut legal_moves: Vec<ChessMove> = positions
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
             .collect();
 
+        match (player, from) {
+            (Color::Black, E8) => legal_moves.append(&mut self.evaluate_black_castle(board)),
+            (Color::White, E1) => legal_moves.append(&mut self.evaluate_white_castle(board)),
+            _ => {}
+        }
+
         legal_moves
+    }
+
+    fn evaluate_white_castle(&self, board: &Board) -> Vec<ChessMove> {
+        println!("evaluating white castle");
+        // has king moved?
+        if dbg!(self.history_contains_from_position(E1)) {
+            println!("white king has moved");
+            return Vec::new();
+        }
+
+        let mut moves = Vec::new();
+
+        // check short castle
+        if dbg!(!self.history_contains_from_position(H1))
+            && dbg!(!board.has_piece_at(F1))
+            && dbg!(!board.has_piece_at(G1))
+            && dbg!(!self.is_under_attack(board, F1, Color::White).is_some())
+            && dbg!(!self.is_under_attack(board, G1, Color::White).is_some())
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: H1,
+                rook_to: F1,
+                king_from: E1,
+                king_to: G1,
+            });
+        }
+
+        // check long castle
+        if dbg!(!self.history_contains_from_position(A1))
+            && dbg!(!board.has_piece_at(D1))
+            && dbg!(!board.has_piece_at(C1))
+            && dbg!(!board.has_piece_at(B1))
+            && dbg!(!self.is_under_attack(board, D1, Color::White).is_some())
+            && dbg!(!self.is_under_attack(board, C1, Color::White).is_some())
+            && dbg!(!self.is_under_attack(board, B1, Color::White).is_some())
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: A1,
+                rook_to: D1,
+                king_from: E1,
+                king_to: C1,
+            })
+        }
+
+        return moves;
+    }
+
+    fn evaluate_black_castle(&self, board: &Board) -> Vec<ChessMove> {
+        println!("evaluating black castle");
+        // has king moved?
+        if self.history_contains_from_position(E8) {
+            return Vec::new();
+        }
+
+        let mut moves = Vec::new();
+
+        // check short castle
+        if !self.history_contains_from_position(H8)
+            && !board.has_piece_at(F8)
+            && !board.has_piece_at(G8)
+            && !self.is_under_attack(board, F8, Color::Black).is_some()
+            && !self.is_under_attack(board, G8, Color::Black).is_some()
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: H8,
+                rook_to: F8,
+                king_from: E8,
+                king_to: G8,
+            });
+        }
+
+        // check long castle
+        if !self.history_contains_from_position(A8)
+            && !board.has_piece_at(D8)
+            && !board.has_piece_at(C8)
+            && !board.has_piece_at(B8)
+            && !self.is_under_attack(board, D8, Color::Black).is_some()
+            && !self.is_under_attack(board, C8, Color::Black).is_some()
+            && !self.is_under_attack(board, B8, Color::Black).is_some()
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: A8,
+                rook_to: D8,
+                king_from: E8,
+                king_to: C8,
+            })
+        }
+
+        return moves;
     }
 
     fn evaluate_legal_knight_moves_from(
@@ -801,6 +902,11 @@ impl MoveManager {
         }
 
         positions
+    }
+
+    /// Check if the move history contains any move that was made *from* the given index.
+    fn history_contains_from_position(&self, from: Position) -> bool {
+        self.history.iter().any(|(m, _)| m.from() == from)
     }
 }
 
