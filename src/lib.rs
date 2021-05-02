@@ -80,6 +80,15 @@ impl TryFrom<u32> for Rank {
     }
 }
 
+impl TryFrom<char> for Rank {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        let u = value.to_digit(10).ok_or(())?;
+        Self::try_from(u)
+    }
+}
+
 impl Display for Rank {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = match self {
@@ -164,6 +173,25 @@ impl TryFrom<u32> for File {
             6 => F,
             7 => G,
             8 => H,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<char> for File {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        use File::*;
+        Ok(match value.to_lowercase().to_string().as_str() {
+            "a" => A,
+            "b" => B,
+            "c" => C,
+            "d" => D,
+            "e" => E,
+            "f" => F,
+            "g" => G,
+            "h" => H,
             _ => return Err(()),
         })
     }

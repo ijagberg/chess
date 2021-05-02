@@ -3,6 +3,8 @@ use crate::{
     Board, Color,
 };
 
+mod uci;
+
 pub struct Game {
     current_player: Color,
     move_manager: MoveManager,
@@ -52,6 +54,7 @@ impl Game {
         } else if !self.move_manager.is_legal(chess_move) {
             Err("illegal move")
         } else {
+            println!("making move: {:?}", chess_move);
             self.move_manager
                 .make_move(&mut self.board, self.current_player, chess_move);
             self.current_player = self.current_player.opponent();
