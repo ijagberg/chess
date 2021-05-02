@@ -1,104 +1,59 @@
 use std::fmt::Display;
 
-use crate::{ChessIndex, Color};
+use crate::Color;
+use PieceType::*;
 
-#[derive(Clone, PartialEq, Debug, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Piece {
-    piece_type: PieceType,
-    color: Color,
-    history: Vec<ChessIndex>,
+    pub(crate) color: Color,
+    pub(crate) kind: PieceType,
 }
 
 impl Piece {
-    pub fn new(piece_type: PieceType, color: Color) -> Self {
-        Self {
-            piece_type,
-            color,
-            history: Vec::new(),
-        }
+    pub fn new(color: Color, kind: PieceType) -> Self {
+        Self { color, kind }
     }
 
-    pub fn piece_type(&self) -> PieceType {
-        self.piece_type
+    pub fn kind(&self) -> PieceType {
+        self.kind
     }
 
     pub fn color(&self) -> Color {
         self.color
     }
 
-    pub fn history(&self) -> &Vec<ChessIndex> {
-        &self.history
-    }
-
-    pub fn has_made_move(&self) -> bool {
-        self.history.len() > 1
-    }
-
-    pub fn previous_index(&self) -> Option<&ChessIndex> {
-        if self.history().len() < 2 {
-            None
-        } else {
-            self.history().get(self.history().len() - 2)
-        }
-    }
-
-    pub(crate) fn add_index_to_history(&mut self, index: ChessIndex) {
-        self.history.push(index);
-    }
-
-    pub fn is_pawn(&self) -> bool {
-        matches!(self.piece_type(), PieceType::Pawn)
-    }
-
-    pub fn is_knight(&self) -> bool {
-        matches!(self.piece_type(), PieceType::Knight)
-    }
-
-    pub fn is_rook(&self) -> bool {
-        matches!(self.piece_type(), PieceType::Rook)
-    }
-
-    pub fn is_bishop(&self) -> bool {
-        matches!(self.piece_type(), PieceType::Bishop)
-    }
-
-    pub fn is_queen(&self) -> bool {
-        matches!(self.piece_type(), PieceType::Queen)
-    }
-
-    pub fn is_king(&self) -> bool {
-        matches!(self.piece_type(), PieceType::King)
+    pub fn is_color(&self, color: Color) -> bool {
+        self.color() == color
     }
 
     pub fn pawn(color: Color) -> Self {
-        Self::new(PieceType::Pawn, color)
-    }
-
-    pub fn knight(color: Color) -> Self {
-        Self::new(PieceType::Knight, color)
+        Self::new(color, Pawn)
     }
 
     pub fn bishop(color: Color) -> Self {
-        Self::new(PieceType::Bishop, color)
+        Self::new(color, Bishop)
+    }
+
+    pub fn knight(color: Color) -> Self {
+        Self::new(color, Knight)
     }
 
     pub fn rook(color: Color) -> Self {
-        Self::new(PieceType::Rook, color)
+        Self::new(color, Rook)
     }
 
     pub fn queen(color: Color) -> Self {
-        Self::new(PieceType::Queen, color)
+        Self::new(color, Queen)
     }
 
     pub fn king(color: Color) -> Self {
-        Self::new(PieceType::King, color)
+        Self::new(color, King)
     }
 }
 
 impl Display for Piece {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = match (&self.color(), &self.piece_type()) {
+        let output = match (&self.color(), &self.kind()) {
             (Color::Black, PieceType::Pawn) => "♟︎",
             (Color::Black, PieceType::Knight) => "♞",
             (Color::Black, PieceType::Bishop) => "♝",
@@ -116,8 +71,7 @@ impl Display for Piece {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -125,19 +79,4 @@ pub enum PieceType {
     Rook,
     Queen,
     King,
-}
-
-impl Display for PieceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let output = match self {
-            PieceType::Pawn => "Pawn",
-            PieceType::Knight => "Knight",
-            PieceType::Bishop => "Bishop",
-            PieceType::Rook => "Rook",
-            PieceType::Queen => "Queen",
-            PieceType::King => "King",
-        };
-
-        write!(f, "{}", output)
-    }
 }
