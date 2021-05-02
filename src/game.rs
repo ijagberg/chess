@@ -1,6 +1,6 @@
 use crate::{
     chess_move::{ChessMove, MoveManager},
-    Board, Color,
+    Board, Color, Position,
 };
 
 pub struct Game {
@@ -32,6 +32,18 @@ impl Game {
 
     pub fn get_moves(&self) -> &Vec<ChessMove> {
         self.move_manager.get_legal_moves()
+    }
+
+    pub fn get_moves_from(&self, from: Position) -> Vec<ChessMove> {
+        let moves = self.move_manager.get_legal_moves();
+        let mut moves_from = Vec::new();
+        for &chess_move in moves {
+            if chess_move.from() == from {
+                moves_from.push(chess_move);
+            }
+        }
+
+        moves_from
     }
 
     pub fn is_over(&self) -> bool {
