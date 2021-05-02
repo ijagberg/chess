@@ -5,6 +5,7 @@ use simple_grid::GridIndex;
 use std::{
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
+    str::FromStr,
 };
 
 mod board;
@@ -112,6 +113,15 @@ impl From<Rank> for u32 {
     }
 }
 
+impl TryFrom<char> for Rank {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        let u = value.to_digit(10).ok_or(())?;
+        Rank::try_from(u)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum File {
     A,
@@ -185,6 +195,25 @@ impl From<File> for u32 {
     }
 }
 
+impl TryFrom<char> for File {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        use File::*;
+        Ok(match value {
+            'a' | 'A' => A,
+            'b' | 'B' => B,
+            'c' | 'C' => C,
+            'd' | 'D' => D,
+            'e' | 'E' => E,
+            'f' | 'F' => F,
+            'g' | 'G' => G,
+            'h' | 'H' => H,
+            _ => return Err(()),
+        })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position(File, Rank);
 
@@ -216,6 +245,21 @@ impl Position {
 impl Debug for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.file(), self.rank())
+    }
+}
+
+impl FromStr for Position {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() != 2 {
+            return Err(());
+        }
+
+        let file = File::try_from(chars[0])?;
+        let rank = Rank::try_from(chars[1])?;
+        Ok(Self::new(file, rank))
     }
 }
 

@@ -1,6 +1,5 @@
-use std::fmt::Display;
-
 use crate::Color;
+use std::fmt::Display;
 use PieceType::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
