@@ -49,7 +49,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Color::*;
+    use crate::{chess_move::PromotionPiece, Color::*};
     use crate::{prelude::*, Position};
 
     #[test]
@@ -94,6 +94,18 @@ mod tests {
         assert!(game.make_move(regular(C3, C4)).is_err()); // can't make this move because it would remove the block from earlier
     }
 
+    #[test]
+    fn promotion() {
+        let mut game = setup_promotion_game();
+
+        game.make_move(ChessMove::Promotion {
+            from: A7,
+            to: B8,
+            piece: PromotionPiece::Queen,
+        })
+        .unwrap();
+    }
+
     /// Set up a game where en passant is possible
     fn setup_game_1() -> Game {
         let mut game = Game::new();
@@ -111,6 +123,20 @@ mod tests {
         game.make_move(regular(E7, E5)).unwrap();
         game.make_move(regular(D2, D4)).unwrap();
         game.make_move(regular(F8, B4)).unwrap();
+        game
+    }
+
+    /// Set up a game where white can promote a pawn
+    fn setup_promotion_game() -> Game {
+        let mut game = Game::new();
+        game.make_move(regular(B2, B4)).unwrap();
+        game.make_move(regular(A7, A5)).unwrap();
+        game.make_move(regular(B4, A5)).unwrap();
+        game.make_move(regular(B7, B6)).unwrap();
+        game.make_move(regular(A5, A6)).unwrap();
+        game.make_move(regular(B6, B5)).unwrap();
+        game.make_move(regular(A6, A7)).unwrap();
+        game.make_move(regular(B5, B4)).unwrap();
         game
     }
 

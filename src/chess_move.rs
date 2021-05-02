@@ -90,6 +90,14 @@ impl ChessMove {
             } => king_to,
         }
     }
+
+    pub(crate) fn promotion_moves(from: Position, to: Position) -> Vec<ChessMove> {
+        use PromotionPiece as PP;
+        [PP::Bishop, PP::Knight, PP::Rook, PP::Queen]
+            .iter()
+            .map(|&piece| ChessMove::Promotion { from, to, piece })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -176,7 +184,9 @@ impl MoveManager {
                 taken_piece = Some(taken);
             }
             ChessMove::Promotion { from, to, piece } => {
-                todo!()
+                let piece = board.take_piece(from).unwrap();
+                let taken = board.set_piece(to, piece);
+                taken_piece = taken;
             }
             ChessMove::Castle {
                 rook_from,
@@ -257,7 +267,7 @@ impl MoveManager {
             let is_cardinal_checker = |pos: Option<Position>| {
                 if let Some(pos) = pos {
                     if let Some(piece) = board[pos] {
-                        if piece.color() == color.opponent() && matches!(piece.kind(), Queen | Rook)
+                        if piece.is_color(color.opponent()) && matches!(piece.kind(), Queen | Rook)
                         {
                             return Some((pos, piece));
                         }
@@ -304,7 +314,7 @@ impl MoveManager {
             let is_diagonal_checker = |pos: Option<Position>| {
                 if let Some(pos) = pos {
                     if let Some(piece) = board[pos] {
-                        if piece.color() == color.opponent()
+                        if piece.is_color(color.opponent())
                             && matches!(piece.kind(), Queen | Bishop)
                         {
                             return Some((pos, piece));
@@ -350,7 +360,7 @@ impl MoveManager {
         // knight moves
         {
             let is_knight_checker =
-                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), Knight);
+                |piece: Piece| piece.is_color(color.opponent()) && matches!(piece.kind(), Knight);
             for pos in KNIGHT_OFFSETS
                 .iter()
                 .filter_map(|&(file_step, rank_step)| target.add_offset(file_step, rank_step))
@@ -366,7 +376,7 @@ impl MoveManager {
         // king moves
         {
             let is_king_checker =
-                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), King);
+                |piece: Piece| piece.is_color(color.opponent()) && matches!(piece.kind(), King);
 
             for pos in KING_OFFSETS
                 .iter()
@@ -383,7 +393,7 @@ impl MoveManager {
         // pawn moves
         {
             let is_pawn_checker =
-                |piece: Piece| piece.color() == color.opponent() && matches!(piece.kind(), Pawn);
+                |piece: Piece| piece.is_color(color.opponent()) && matches!(piece.kind(), Pawn);
 
             let offsets = match color {
                 Black => [(-1, -1), (1, -1)],
@@ -450,7 +460,25 @@ impl MoveManager {
     ) -> Vec<ChessMove> {
         if from.rank() == Rank::Seventh {
             // from here it's only possible to promote
-            todo!()
+
+            let mut moves = Vec::new();
+
+            // check position in front
+            let to = Position::new(from.file(), Rank::Eighth);
+            if !board.has_piece_at(to) {
+                moves.append(&mut ChessMove::promotion_moves(from, to));
+            }
+
+            for to in [(-1, 1), (1, 1)]
+                .iter()
+                .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
+            {
+                if board.has_piece_with_color_at(to, Color::Black) {
+                    moves.append(&mut ChessMove::promotion_moves(from, to));
+                }
+            }
+
+            return moves;
         } else {
             let mut positions = Vec::new();
 
@@ -512,7 +540,25 @@ impl MoveManager {
     ) -> Vec<ChessMove> {
         if from.rank() == Rank::Second {
             // from here it's only possible to promote
-            todo!()
+
+            let mut moves = Vec::new();
+
+            // check position in front
+            let to = Position::new(from.file(), Rank::First);
+            if !board.has_piece_at(to) {
+                moves.append(&mut ChessMove::promotion_moves(from, to));
+            }
+
+            for to in [(-1, -1), (1, -1)]
+                .iter()
+                .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
+            {
+                if board.has_piece_with_color_at(to, Color::White) {
+                    moves.append(&mut ChessMove::promotion_moves(from, to));
+                }
+            }
+
+            return moves;
         } else {
             let mut positions = Vec::new();
 
