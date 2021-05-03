@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+mod bitboard;
 mod board;
 mod chess_move;
 pub mod consts;

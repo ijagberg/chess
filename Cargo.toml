@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["Isak Jägberg <ijagberg@gmail.com>"]
 edition = "2018"
 
-
 [dependencies]
 simple-grid = { version = "2.0.0" }
+bytes = "1.0.1"
