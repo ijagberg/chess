@@ -41,6 +41,7 @@ impl Display for Color {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Rank {
     First,
     Second,
@@ -123,6 +124,7 @@ impl TryFrom<char> for Rank {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum File {
     A,
     B,
@@ -215,6 +217,7 @@ impl TryFrom<char> for File {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Position(File, Rank);
 
 impl Position {

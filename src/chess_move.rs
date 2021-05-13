@@ -24,6 +24,7 @@ const KING_OFFSETS: [(i32, i32); 8] = [
 ];
 
 #[derive(Clone, Debug, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ChessMove {
     Regular {
         from: Position,
@@ -101,6 +102,7 @@ impl ChessMove {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PromotionPiece {
     Knight,
     Bishop,
