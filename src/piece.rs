@@ -79,3 +79,93 @@ pub enum PieceType {
     Queen,
     King,
 }
+
+impl PieceType {
+    /// Returns `true` if the piece_type is [`Pawn`].
+    pub fn is_pawn(&self) -> bool {
+        matches!(self, Self::Pawn)
+    }
+
+    /// Returns `true` if the piece_type is [`Knight`].
+    pub fn is_knight(&self) -> bool {
+        matches!(self, Self::Knight)
+    }
+
+    /// Returns `true` if the piece_type is [`Bishop`].
+    pub fn is_bishop(&self) -> bool {
+        matches!(self, Self::Bishop)
+    }
+
+    /// Returns `true` if the piece_type is [`Rook`].
+    pub fn is_rook(&self) -> bool {
+        matches!(self, Self::Rook)
+    }
+
+    /// Returns `true` if the piece_type is [`Queen`].
+    pub fn is_queen(&self) -> bool {
+        matches!(self, Self::Queen)
+    }
+
+    /// Returns `true` if the piece_type is [`King`].
+    pub fn is_king(&self) -> bool {
+        matches!(self, Self::King)
+    }
+}
+
+pub(crate) mod constructors {
+    use crate::piece::PieceType::{self, *};
+    use crate::Color::{self, *};
+    use crate::Piece;
+
+    fn p(color: Color, kind: PieceType) -> Piece {
+        Piece::new(color, kind)
+    }
+
+    pub fn white_pawn() -> Piece {
+        p(White, Pawn)
+    }
+
+    pub fn black_pawn() -> Piece {
+        p(Black, Pawn)
+    }
+
+    pub fn white_knight() -> Piece {
+        p(White, Knight)
+    }
+
+    pub fn black_knight() -> Piece {
+        p(Black, Knight)
+    }
+
+    pub fn white_bishop() -> Piece {
+        p(White, Bishop)
+    }
+
+    pub fn black_bishop() -> Piece {
+        p(Black, Bishop)
+    }
+
+    pub fn white_rook() -> Piece {
+        p(White, Rook)
+    }
+
+    pub fn black_rook() -> Piece {
+        p(Black, Rook)
+    }
+
+    pub fn white_queen() -> Piece {
+        p(White, Queen)
+    }
+
+    pub fn black_queen() -> Piece {
+        p(Black, Queen)
+    }
+
+    pub fn white_king() -> Piece {
+        p(White, King)
+    }
+
+    pub fn black_king() -> Piece {
+        p(Black, King)
+    }
+}

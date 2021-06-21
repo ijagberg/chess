@@ -58,11 +58,11 @@ impl Game {
         }
     }
 
-    pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), &'static str> {
+    pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), String> {
         if self.is_over() {
-            Err("game is over")
+            Err("game is over".to_string())
         } else if !self.move_manager.is_legal(chess_move) {
-            Err("illegal move")
+            Err(format!("{:?} is an illegal move", chess_move))
         } else {
             self.move_manager
                 .make_move(&mut self.board, self.current_player, chess_move);
@@ -71,6 +71,12 @@ impl Game {
                 .evaluate_legal_moves(&self.board, self.current_player);
             Ok(())
         }
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -264,6 +270,218 @@ mod tests {
         game.make_move(regular(D8, E8)).unwrap();
         game.make_move(regular(E6, C7)).unwrap();
         game.make_move(regular(E7, B4)).unwrap();
+        assert_eq!(game.winner(), Some(Color::Black));
+    }
+
+    #[test]
+    fn game_test() {
+        let mut game = Game::new();
+
+        let mut moves = Vec::new();
+        moves.extend(
+            [
+                (G1, F3),
+                (G8, F6),
+                (D2, D4),
+                (G7, G6),
+                (E2, E3),
+                (F8, G7),
+                (C2, C4),
+                (D7, D5),
+                (B2, B3),
+                (E7, E6),
+                (C1, B2),
+                (B8, C6),
+                (F1, D3),
+                (B7, B6),
+            ]
+            .iter()
+            .map(|&(from, to)| regular(from, to)),
+        );
+        moves.push(ChessMove::Castle {
+            rook_from: H1,
+            rook_to: F1,
+            king_from: E1,
+            king_to: G1,
+        });
+        moves.extend(
+            [(C8, B7), (B1, C3)]
+                .iter()
+                .map(|&(from, to)| regular(from, to)),
+        );
+        moves.push(ChessMove::Castle {
+            rook_from: H8,
+            rook_to: F8,
+            king_from: E8,
+            king_to: G8,
+        });
+        moves.extend(
+            [
+                (F1, E1),
+                (F8, E8),
+                (A1, C1),
+                (E6, E5),
+                (D4, E5),
+                (C6, E5),
+                (F3, E5),
+                (E8, E5),
+                (C3, D5),
+                (E5, E8),
+                (D5, F4),
+                (D8, D7),
+                (D1, D2),
+                (F6, H5),
+                (F4, H5),
+                (G6, H5),
+                (B2, G7),
+                (D7, G4),
+                (F2, F3),
+                (G4, G7),
+                (C4, C5),
+                (B7, F3),
+                (G1, H1),
+                (F3, E4),
+                (C5, B6),
+                (A7, B6),
+                (D3, E4),
+                (E8, E4),
+                (C1, C7),
+                (G7, E5),
+                (C7, C2),
+                (E4, H4),
+                (G2, G3),
+                (E5, E4),
+                (D2, G2),
+                (E4, G2),
+                (H1, G2),
+                (H4, E4),
+                (G2, F3),
+                (A8, E8),
+                (C2, C6),
+                (E4, B4),
+                (E1, C1),
+                (E8, A8),
+                (C6, C8),
+                (A8, C8),
+                (C1, C8),
+                (G8, G7),
+                (C8, C4),
+                (B4, B5),
+                (F3, F4),
+                (G7, F6),
+                (C4, C6),
+                (F6, E7),
+                (C6, C7),
+                (E7, E6),
+                (G3, G4),
+                (B5, B4),
+                (F4, G3),
+                (B4, G4),
+                (G3, F3),
+                (G4, G1),
+                (C7, C6),
+                (E6, E5),
+                (C6, B6),
+                (G1, A1),
+                (A2, A4),
+                (A1, B1),
+                (B6, B5),
+                (E5, D6),
+                (B5, H5),
+                (B1, B3),
+                (H5, H7),
+                (D6, E6),
+                (H7, H4),
+                (F7, F5),
+                (H4, F4),
+                (E6, E5),
+                (F3, G3),
+                (B3, E3),
+                (F4, F3),
+                (E3, E4),
+                (H2, H4),
+                (E4, A4),
+                (H4, H5),
+                (A4, A6),
+                (F3, F2),
+                (A6, A3),
+                (G3, H4),
+                (A3, A6),
+                (H4, G5),
+                (A6, F6),
+                (H5, H6),
+                (F5, F4),
+                (H6, H7),
+                (F6, F8),
+                (G5, G6),
+                (E5, E4),
+                (G6, G7),
+                (F8, D8),
+            ]
+            .iter()
+            .map(|&(from, to)| regular(from, to)),
+        );
+        moves.push(ChessMove::Promotion {
+            from: H7,
+            to: H8,
+            piece: PromotionPiece::Queen,
+        });
+        moves.extend(
+            [
+                (D8, H8),
+                (G7, H8),
+                (E4, E3),
+                (H8, G7),
+                (E3, F2),
+                (G7, F6),
+                (F2, E3),
+                (F6, F5),
+                (F4, F3),
+                (F5, G4),
+                (F3, F2),
+                (G4, G3),
+            ]
+            .iter()
+            .map(|&(from, to)| regular(from, to)),
+        );
+        moves.push(ChessMove::Promotion {
+            from: F2,
+            to: F1,
+            piece: PromotionPiece::Queen,
+        });
+        moves.extend(
+            [
+                (G3, G4),
+                (F1, F2),
+                (G4, G5),
+                (F2, F3),
+                (G5, G6),
+                (F3, F4),
+                (G6, G7),
+                (F4, F5),
+                (G7, G8),
+                (F5, D7),
+                (G8, F8),
+                (D7, D6),
+                (F8, G8),
+                (D6, E7),
+                (G8, H8),
+                (E3, F4),
+                (H8, G8),
+                (F4, F5),
+                (G8, H8),
+                (F5, G6),
+                (H8, G8),
+                (E7, G7),
+            ]
+            .iter()
+            .map(|&(from, to)| regular(from, to)),
+        );
+
+        for m in moves {
+            game.make_move(m).unwrap();
+        }
+
         assert_eq!(game.winner(), Some(Color::Black));
     }
 

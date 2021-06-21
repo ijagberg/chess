@@ -57,6 +57,7 @@ impl Board {
 
 impl Default for Board {
     fn default() -> Self {
+        use crate::piece::constructors::*;
         use crate::piece::PieceType::*;
         use crate::Color::*;
 
@@ -65,40 +66,40 @@ impl Default for Board {
         let mut board = Self::new(grid);
 
         // white pieces
-        board.set_piece(A1, Piece::new(White, Rook));
-        board.set_piece(B1, Piece::new(White, Knight));
-        board.set_piece(C1, Piece::new(White, Bishop));
-        board.set_piece(D1, Piece::new(White, Queen));
-        board.set_piece(E1, Piece::new(White, King));
-        board.set_piece(F1, Piece::new(White, Bishop));
-        board.set_piece(G1, Piece::new(White, Knight));
-        board.set_piece(H1, Piece::new(White, Rook));
-        board.set_piece(A2, Piece::new(White, Pawn));
-        board.set_piece(B2, Piece::new(White, Pawn));
-        board.set_piece(C2, Piece::new(White, Pawn));
-        board.set_piece(D2, Piece::new(White, Pawn));
-        board.set_piece(E2, Piece::new(White, Pawn));
-        board.set_piece(F2, Piece::new(White, Pawn));
-        board.set_piece(G2, Piece::new(White, Pawn));
-        board.set_piece(H2, Piece::new(White, Pawn));
+        board.set_piece(A1, white_rook());
+        board.set_piece(B1, white_knight());
+        board.set_piece(C1, white_bishop());
+        board.set_piece(D1, white_queen());
+        board.set_piece(E1, white_king());
+        board.set_piece(F1, white_bishop());
+        board.set_piece(G1, white_knight());
+        board.set_piece(H1, white_rook());
+        board.set_piece(A2, white_pawn());
+        board.set_piece(B2, white_pawn());
+        board.set_piece(C2, white_pawn());
+        board.set_piece(D2, white_pawn());
+        board.set_piece(E2, white_pawn());
+        board.set_piece(F2, white_pawn());
+        board.set_piece(G2, white_pawn());
+        board.set_piece(H2, white_pawn());
 
         // black pieces
-        board.set_piece(A8, Piece::new(Black, Rook));
-        board.set_piece(B8, Piece::new(Black, Knight));
-        board.set_piece(C8, Piece::new(Black, Bishop));
-        board.set_piece(D8, Piece::new(Black, Queen));
-        board.set_piece(E8, Piece::new(Black, King));
-        board.set_piece(F8, Piece::new(Black, Bishop));
-        board.set_piece(G8, Piece::new(Black, Knight));
-        board.set_piece(H8, Piece::new(Black, Rook));
-        board.set_piece(A7, Piece::new(Black, Pawn));
-        board.set_piece(B7, Piece::new(Black, Pawn));
-        board.set_piece(C7, Piece::new(Black, Pawn));
-        board.set_piece(D7, Piece::new(Black, Pawn));
-        board.set_piece(E7, Piece::new(Black, Pawn));
-        board.set_piece(F7, Piece::new(Black, Pawn));
-        board.set_piece(G7, Piece::new(Black, Pawn));
-        board.set_piece(H7, Piece::new(Black, Pawn));
+        board.set_piece(A8, black_rook());
+        board.set_piece(B8, black_knight());
+        board.set_piece(C8, black_bishop());
+        board.set_piece(D8, black_queen());
+        board.set_piece(E8, black_king());
+        board.set_piece(F8, black_bishop());
+        board.set_piece(G8, black_knight());
+        board.set_piece(H8, black_rook());
+        board.set_piece(A7, black_pawn());
+        board.set_piece(B7, black_pawn());
+        board.set_piece(C7, black_pawn());
+        board.set_piece(D7, black_pawn());
+        board.set_piece(E7, black_pawn());
+        board.set_piece(F7, black_pawn());
+        board.set_piece(G7, black_pawn());
+        board.set_piece(H7, black_pawn());
 
         board
     }

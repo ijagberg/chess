@@ -149,14 +149,12 @@ impl MoveManager {
                 }
             }
         }
-        let mut this = Self {
+        Self {
             history: vec![],
             legal_moves: vec![],
             black_king: black_king.expect("no black king on board"),
             white_king: white_king.expect("no white king on board"),
-        };
-
-        this
+        }
     }
 
     pub(crate) fn is_legal(&self, chess_move: ChessMove) -> bool {
@@ -242,13 +240,9 @@ impl MoveManager {
         let mut actual_legal_moves = Vec::new();
         let mut board_clone = board.clone();
         for &legal_move in &legal_moves {
-            print!("testing move: {}, {:?}", player, legal_move);
             self.make_move(&mut board_clone, player, legal_move);
             if !self.is_in_check(&board_clone, player) {
-                println!(" LEGAL");
                 actual_legal_moves.push(legal_move);
-            } else {
-                println!(" ILLEGAL");
             }
             self.undo_last_move(&mut board_clone);
         }
@@ -366,7 +360,7 @@ impl MoveManager {
                         }
                     }
                 }
-                return None;
+                None
             };
 
             let up_file = self
@@ -414,7 +408,7 @@ impl MoveManager {
                         }
                     }
                 }
-                return None;
+                None
             };
 
             let up_file_up_rank = self
@@ -571,7 +565,7 @@ impl MoveManager {
                 }
             }
 
-            return moves;
+            moves
         } else {
             let mut positions = Vec::new();
 
@@ -652,7 +646,7 @@ impl MoveManager {
                 }
             }
 
-            return moves;
+            moves
         } else {
             let mut positions = Vec::new();
 
@@ -757,8 +751,8 @@ impl MoveManager {
         if !self.history_contains_from_position(H1)
             && !board.has_piece_at(F1)
             && !board.has_piece_at(G1)
-            && !self.is_under_attack(board, F1, Color::White).is_some()
-            && !self.is_under_attack(board, G1, Color::White).is_some()
+            && self.is_under_attack(board, F1, Color::White).is_none()
+            && self.is_under_attack(board, G1, Color::White).is_none()
         {
             moves.push(ChessMove::Castle {
                 rook_from: H1,
@@ -773,9 +767,9 @@ impl MoveManager {
             && !board.has_piece_at(D1)
             && !board.has_piece_at(C1)
             && !board.has_piece_at(B1)
-            && !self.is_under_attack(board, D1, Color::White).is_some()
-            && !self.is_under_attack(board, C1, Color::White).is_some()
-            && !self.is_under_attack(board, B1, Color::White).is_some()
+            && self.is_under_attack(board, D1, Color::White).is_none()
+            && self.is_under_attack(board, C1, Color::White).is_none()
+            && self.is_under_attack(board, B1, Color::White).is_none()
         {
             moves.push(ChessMove::Castle {
                 rook_from: A1,
@@ -785,7 +779,7 @@ impl MoveManager {
             })
         }
 
-        return moves;
+        moves
     }
 
     fn evaluate_black_castle(&self, board: &Board) -> Vec<ChessMove> {
@@ -800,8 +794,8 @@ impl MoveManager {
         if !self.history_contains_from_position(H8)
             && !board.has_piece_at(F8)
             && !board.has_piece_at(G8)
-            && !self.is_under_attack(board, F8, Color::Black).is_some()
-            && !self.is_under_attack(board, G8, Color::Black).is_some()
+            && self.is_under_attack(board, F8, Color::Black).is_none()
+            && self.is_under_attack(board, G8, Color::Black).is_none()
         {
             moves.push(ChessMove::Castle {
                 rook_from: H8,
@@ -816,9 +810,9 @@ impl MoveManager {
             && !board.has_piece_at(D8)
             && !board.has_piece_at(C8)
             && !board.has_piece_at(B8)
-            && !self.is_under_attack(board, D8, Color::Black).is_some()
-            && !self.is_under_attack(board, C8, Color::Black).is_some()
-            && !self.is_under_attack(board, B8, Color::Black).is_some()
+            && self.is_under_attack(board, D8, Color::Black).is_none()
+            && self.is_under_attack(board, C8, Color::Black).is_none()
+            && self.is_under_attack(board, B8, Color::Black).is_none()
         {
             moves.push(ChessMove::Castle {
                 rook_from: A8,
@@ -828,7 +822,7 @@ impl MoveManager {
             })
         }
 
-        return moves;
+        moves
     }
 
     fn evaluate_legal_knight_moves_from(
@@ -854,12 +848,10 @@ impl MoveManager {
             }
         }
 
-        let legal_moves = positions
+        positions
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
-            .collect();
-
-        legal_moves
+            .collect()
     }
 
     fn evaluate_legal_bishop_moves_from(
@@ -882,12 +874,10 @@ impl MoveManager {
         let mut down_file_down_rank = self.step_until_collision(from, -1, -1, board, player);
         positions.append(&mut down_file_down_rank);
 
-        let legal_moves = positions
+        positions
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
-            .collect();
-
-        legal_moves
+            .collect()
     }
 
     fn evaluate_legal_rook_moves_from(
@@ -910,12 +900,10 @@ impl MoveManager {
         let mut down_rank = self.step_until_collision(from, 0, -1, board, player);
         positions.append(&mut down_rank);
 
-        let legal_moves = positions
+        positions
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
-            .collect();
-
-        legal_moves
+            .collect()
     }
 
     fn evaluate_legal_queen_moves_from(
@@ -950,12 +938,10 @@ impl MoveManager {
         let mut down_rank = self.step_until_collision(from, 0, -1, board, player);
         positions.append(&mut down_rank);
 
-        let legal_moves = positions
+        positions
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
-            .collect();
-
-        legal_moves
+            .collect()
     }
 
     fn step_until_collision(
