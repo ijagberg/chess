@@ -48,6 +48,10 @@ impl Piece {
     pub fn king(color: Color) -> Self {
         Self::new(color, King)
     }
+
+    pub(crate) fn speech_string(&self) -> String {
+        format!("{} {}", self.color(), self.kind())
+    }
 }
 
 impl Display for Piece {
@@ -70,7 +74,7 @@ impl Display for Piece {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -109,6 +113,21 @@ impl PieceType {
     /// Returns `true` if the piece_type is [`King`].
     pub fn is_king(&self) -> bool {
         matches!(self, Self::King)
+    }
+}
+
+impl Display for PieceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = match self {
+            Pawn => "pawn",
+            Knight => "knight",
+            Bishop => "bishop",
+            Rook => "rook",
+            Queen => "queen",
+            King => "king",
+        };
+
+        write!(f, "{}", output)
     }
 }
 

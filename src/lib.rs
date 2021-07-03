@@ -11,6 +11,7 @@ use std::{
 mod board;
 mod chess_move;
 pub mod consts;
+mod eval;
 mod game;
 mod piece;
 pub mod prelude;
@@ -33,8 +34,8 @@ impl Color {
 impl Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = match self {
-            Color::Black => "Black",
-            Color::White => "White",
+            Color::Black => "black",
+            Color::White => "white",
         };
         write!(f, "{}", output)
     }
@@ -61,6 +62,24 @@ impl Rank {
             false => v.checked_add(offset as u32)?.try_into().ok(),
         }
     }
+
+    pub(crate) fn mirrored(&self) -> Self {
+        use Rank::*;
+        match self {
+            First => Eighth,
+            Second => Seventh,
+            Third => Sixth,
+            Fourth => Fifth,
+            Fifth => Fourth,
+            Sixth => Third,
+            Seventh => Second,
+            Eighth => First,
+        }
+    }
+}
+
+pub fn ranks() -> impl Iterator<Item = Rank> {
+    (1..=8).map(|u| Rank::try_from(u).unwrap())
 }
 
 impl TryFrom<u32> for Rank {
@@ -144,6 +163,24 @@ impl File {
             false => v.checked_add(offset as u32)?.try_into().ok(),
         }
     }
+
+    pub(crate) fn mirrored(&self) -> Self {
+        use File::*;
+        match self {
+            A => H,
+            B => G,
+            C => F,
+            D => E,
+            E => D,
+            F => C,
+            G => B,
+            H => A,
+        }
+    }
+}
+
+pub fn files() -> impl Iterator<Item = File> {
+    (1..=8).map(|u| File::try_from(u).unwrap())
 }
 
 impl Display for File {
@@ -242,6 +279,10 @@ impl Position {
 
     pub(crate) fn all_iter() -> impl Iterator<Item = Self> {
         consts::INCREASING_ORDER.iter().copied()
+    }
+
+    pub(crate) fn mirrored(&self) -> Self {
+        Self::new(self.file().mirrored(), self.rank().mirrored())
     }
 }
 
