@@ -163,8 +163,9 @@ impl ChessBoard {
         let bit_index = Bitboard::new().with_one(pos);
 
         let color = self.get_color_of_pos(pos)?;
+        let kind = self.get_kind_of_pos(pos)?;
 
-        todo!()
+        Some(Piece::new(color, kind))
     }
 }
 
@@ -518,5 +519,27 @@ mod tests {
         assert_eq!(b.get_color_of_pos(E1), Some(Color::White));
         assert_eq!(b.get_color_of_pos(A7), Some(Color::Black));
         assert_eq!(b.get_color_of_pos(A6), None);
+    }
+
+    #[test]
+    fn get_kind_of_pos_test() {
+        let b = ChessBoard::new();
+        assert_eq!(b.get_kind_of_pos(E1), Some(PieceType::King));
+        assert_eq!(b.get_kind_of_pos(A7), Some(PieceType::Pawn));
+        assert_eq!(b.get_kind_of_pos(A6), None);
+    }
+
+    #[test]
+    fn get_piece_test() {
+        let b = ChessBoard::new();
+        assert_eq!(
+            b.get_piece(E1),
+            Some(Piece::new(Color::White, PieceType::King))
+        );
+        assert_eq!(
+            b.get_piece(A7),
+            Some(Piece::new(Color::Black, PieceType::Pawn))
+        );
+        assert_eq!(b.get_piece(A6), None);
     }
 }
