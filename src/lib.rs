@@ -114,6 +114,12 @@ impl From<Rank> for u32 {
     }
 }
 
+impl From<Rank> for u64 {
+    fn from(value: Rank) -> Self {
+        u64::from(u32::from(value))
+    }
+}
+
 impl TryFrom<char> for Rank {
     type Error = ();
 
@@ -193,6 +199,12 @@ impl From<File> for u32 {
             G => 7,
             H => 8,
         }
+    }
+}
+
+impl From<File> for u64 {
+    fn from(value: File) -> Self {
+        u64::from(u32::from(value))
     }
 }
 
