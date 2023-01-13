@@ -1,4 +1,5 @@
 use crate::{
+    bitboard::ChessBoard,
     chess_move::{ChessMove, MoveManager},
     Board, Color, Position,
 };
@@ -7,6 +8,7 @@ pub struct Game {
     current_player: Color,
     move_manager: MoveManager,
     board: Board,
+    bitboard: ChessBoard,
 }
 
 impl Game {
@@ -19,6 +21,7 @@ impl Game {
             current_player,
             move_manager,
             board,
+            bitboard: ChessBoard::new(),
         }
     }
 

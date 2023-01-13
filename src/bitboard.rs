@@ -4,6 +4,7 @@ use crate::Color;
 use crate::Piece;
 use crate::Position;
 use std::ops::BitAnd;
+use std::ops::BitAndAssign;
 use std::ops::BitOrAssign;
 use std::ops::Deref;
 use std::{fmt::Debug, ops::BitOr};
@@ -112,9 +113,6 @@ impl ChessBoard {
 
     fn get_color_of_pos(&self, pos: Position) -> Option<Color> {
         let bit_index = Bitboard::new().with_one(pos);
-
-        println!("white_pieces: \n{:#?}", self.white_pieces);
-        println!("black_pieces: \n{:#?}", self.black_pieces);
 
         let white_pieces = self.white_pieces & bit_index;
         if white_pieces.is_nonzero() {
@@ -335,6 +333,12 @@ impl BitAnd for Bitboard {
 
     fn bitand(self, rhs: Self) -> Self::Output {
         Self(self.data() & rhs.data())
+    }
+}
+
+impl BitAndAssign for Bitboard {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = *self & rhs;
     }
 }
 
