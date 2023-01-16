@@ -1,7 +1,10 @@
-use crate::{board::Board, consts::*, game::Game, piece::PieceType, Color, Piece, Position, Rank};
+use crate::{
+    bitboard::ChessBoard, board::Board, consts::*, game::Game, piece::PieceType, Color, Piece,
+    Position, Rank,
+};
 use std::option::Option;
 
-const KNIGHT_OFFSETS: [(i32, i32); 8] = [
+pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
     (2, 1),
     (2, -1),
     (1, 2),
@@ -12,7 +15,7 @@ const KNIGHT_OFFSETS: [(i32, i32); 8] = [
     (-1, -2),
 ];
 
-const KING_OFFSETS: [(i32, i32); 8] = [
+pub const KING_OFFSETS: [(i32, i32); 8] = [
     (0, 1),
     (1, 1),
     (1, 0),
@@ -228,6 +231,12 @@ impl MoveManager {
 
     pub fn get_legal_moves(&self) -> &Vec<ChessMove> {
         &self.legal_moves
+    }
+
+    pub(crate) fn evaluate_legal_moves_bitboard(&mut self, board: &ChessBoard, player: Color) {
+        // let mut legal_moves = Vec::new();
+        for pos in Position::all_iter() {}
+        todo!()
     }
 
     pub(crate) fn evaluate_legal_moves(&mut self, board: &Board, player: Color) {
@@ -521,6 +530,29 @@ impl MoveManager {
                     PieceType::Rook => self.evaluate_legal_rook_moves_from(board, from, player),
                     PieceType::Queen => self.evaluate_legal_queen_moves_from(board, from, player),
                     PieceType::King => self.evaluate_legal_king_moves_from(board, from, player),
+                };
+            }
+        }
+        Vec::new()
+    }
+
+    fn evaluate_legal_moves_from_bitboard(
+        &self,
+        board: &ChessBoard,
+        from: Position,
+        player: Color,
+    ) -> Vec<ChessMove> {
+        if let Some(piece) = board.get_piece(from) {
+            if piece.color() == player {
+                return match piece.kind() {
+                    PieceType::Pawn => todo!(),
+                    PieceType::Knight => {
+                        self.evaluate_legal_knight_moves_from_bitboard(board, from, player)
+                    }
+                    PieceType::Bishop => todo!(),
+                    PieceType::Rook => todo!(),
+                    PieceType::Queen => todo!(),
+                    PieceType::King => todo!(),
                 };
             }
         }
@@ -829,6 +861,34 @@ impl MoveManager {
         return moves;
     }
 
+    fn evaluate_legal_knight_moves_from_bitboard(
+        &self,
+        board: &ChessBoard,
+        from: Position,
+        player: Color,
+    ) -> Vec<ChessMove> {
+        let mut positions = Vec::new();
+
+        for to in KNIGHT_OFFSETS
+            .iter()
+            .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
+        {
+            match board.get_piece(to) {
+                Some(piece) => {
+                    if !piece.is_color(player) {
+                        positions.push(to)
+                    }
+                }
+                None => positions.push(to),
+            }
+        }
+
+        positions
+            .into_iter()
+            .map(|to| ChessMove::Regular { from, to })
+            .collect()
+    }
+
     fn evaluate_legal_knight_moves_from(
         &self,
         board: &Board,
@@ -841,12 +901,12 @@ impl MoveManager {
             .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
         {
             match board.get_piece(to) {
-                Option::Some(piece) => {
+                Some(piece) => {
                     if !piece.is_color(player) {
                         positions.push(to);
                     }
                 }
-                Option::None => {
+                None => {
                     positions.push(to);
                 }
             }

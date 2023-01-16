@@ -1,13 +1,83 @@
 use crate::consts::*;
 use crate::piece::PieceType;
 use crate::Color;
+use crate::File;
 use crate::Piece;
 use crate::Position;
+use crate::Rank;
 use std::ops::BitAnd;
 use std::ops::BitAndAssign;
 use std::ops::BitOrAssign;
 use std::ops::Deref;
+use std::ops::Neg;
+use std::ops::Not;
+use std::ops::Shl;
+use std::ops::Shr;
 use std::{fmt::Debug, ops::BitOr};
+
+const FILE_A: u64 = 0b0000000100000001000000010000000100000001000000010000000100000001;
+const FILE_A_MASK: Bitboard = Bitboard(FILE_A);
+const FILE_A_CLEAR: Bitboard = Bitboard(!FILE_A);
+
+const FILE_B: u64 = 0b0000001000000010000000100000001000000010000000100000001000000010;
+const FILE_B_MASK: Bitboard = Bitboard(FILE_B);
+const FILE_B_CLEAR: Bitboard = Bitboard(!FILE_B);
+
+const FILE_C: u64 = 0b0000010000000100000001000000010000000100000001000000010000000100;
+const FILE_C_MASK: Bitboard = Bitboard(FILE_C);
+const FILE_C_CLEAR: Bitboard = Bitboard(!FILE_C);
+
+const FILE_D: u64 = 0b0000100000001000000010000000100000001000000010000000100000001000;
+const FILE_D_MASK: Bitboard = Bitboard(FILE_D);
+const FILE_D_CLEAR: Bitboard = Bitboard(!FILE_D);
+
+const FILE_E: u64 = 0b0001000000010000000100000001000000010000000100000001000000010000;
+const FILE_E_MASK: Bitboard = Bitboard(FILE_E);
+const FILE_E_CLEAR: Bitboard = Bitboard(!FILE_E);
+
+const FILE_F: u64 = 0b0010000000100000001000000010000000100000001000000010000000100000;
+const FILE_F_MASK: Bitboard = Bitboard(FILE_F);
+const FILE_F_CLEAR: Bitboard = Bitboard(!FILE_F);
+
+const FILE_G: u64 = 0b0100000001000000010000000100000001000000010000000100000001000000;
+const FILE_G_MASK: Bitboard = Bitboard(FILE_G);
+const FILE_G_CLEAR: Bitboard = Bitboard(!FILE_G);
+
+const FILE_H: u64 = 0b1000000010000000100000001000000010000000100000001000000010000000;
+const FILE_H_MASK: Bitboard = Bitboard(FILE_H);
+const FILE_H_CLEAR: Bitboard = Bitboard(!FILE_H);
+
+const RANK_1: u64 = 0b0000000000000000000000000000000000000000000000000000000011111111;
+const RANK_1_MASK: Bitboard = Bitboard(RANK_1);
+const RANK_1_CLEAR: Bitboard = Bitboard(!RANK_1);
+
+const RANK_2: u64 = 0b0000000000000000000000000000000000000000000000001111111100000000;
+const RANK_2_MASK: Bitboard = Bitboard(RANK_2);
+const RANK_2_CLEAR: Bitboard = Bitboard(!RANK_2);
+
+const RANK_3: u64 = 0b0000000000000000000000000000000000000000111111110000000000000000;
+const RANK_3_MASK: Bitboard = Bitboard(RANK_3);
+const RANK_3_CLEAR: Bitboard = Bitboard(!RANK_3);
+
+const RANK_4: u64 = 0b0000000000000000000000000000000011111111000000000000000000000000;
+const RANK_4_MASK: Bitboard = Bitboard(RANK_4);
+const RANK_4_CLEAR: Bitboard = Bitboard(!RANK_4);
+
+const RANK_5: u64 = 0b0000000000000000000000001111111100000000000000000000000000000000;
+const RANK_5_MASK: Bitboard = Bitboard(RANK_5);
+const RANK_5_CLEAR: Bitboard = Bitboard(!RANK_5);
+
+const RANK_6: u64 = 0b0000000000000000111111110000000000000000000000000000000000000000;
+const RANK_6_MASK: Bitboard = Bitboard(RANK_6);
+const RANK_6_CLEAR: Bitboard = Bitboard(!RANK_6);
+
+const RANK_7: u64 = 0b0000000011111111000000000000000000000000000000000000000000000000;
+const RANK_7_MASK: Bitboard = Bitboard(RANK_7);
+const RANK_7_CLEAR: Bitboard = Bitboard(!RANK_7);
+
+const RANK_8: u64 = 0b1111111100000000000000000000000000000000000000000000000000000000;
+const RANK_8_MASK: Bitboard = Bitboard(RANK_8);
+const RANK_8_CLEAR: Bitboard = Bitboard(!RANK_8);
 
 pub struct ChessBoard {
     white_king: Bitboard,
@@ -165,9 +235,30 @@ impl ChessBoard {
 
         Some(Piece::new(color, kind))
     }
+
+    pub fn has_piece_of_color_at(&self, color: Color, pos: Position) -> bool {
+        let position = Bitboard::from(pos);
+        match color {
+            Color::Black => self.black_pieces & position,
+            Color::White => self.white_pieces & position,
+        }
+        .is_nonzero()
+    }
+
+    pub fn knight_moves(&self, color: Color, pos: Position) -> Bitboard {
+        Bitboard::knight_moves(pos)
+            & match color {
+                Color::Black => !self.black_pieces,
+                Color::White => !self.white_pieces,
+            }
+    }
+
+    pub fn king_moves(&self, color: Color, pos: Position) -> Bitboard {
+        todo!()
+    }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Bitboard(u64);
 
 impl Bitboard {
@@ -182,6 +273,104 @@ impl Bitboard {
     fn with_one(mut self, pos: Position) -> Self {
         self.set_bit(pos);
         self
+    }
+
+    fn with_multiple(mut self, positions: &[Position]) -> Self {
+        for pos in positions {
+            self = self.with_one(*pos);
+        }
+        self
+    }
+
+    pub(crate) fn knight_moves(pos: Position) -> Self {
+        let bb = Self::new().with_one(pos);
+        let north_east = (bb << 17) & FILE_A_CLEAR;
+        let east_north = (bb << 10) & FILE_A_CLEAR & FILE_B_CLEAR;
+        let east_south = (bb >> 6) & FILE_A_CLEAR & FILE_B_CLEAR;
+        let south_east = (bb >> 15) & FILE_A_CLEAR;
+        let south_west = (bb >> 17) & FILE_H_CLEAR;
+        let west_south = (bb >> 10) & FILE_H_CLEAR & FILE_G_CLEAR;
+        let west_north = (bb << 6) & FILE_H_CLEAR & FILE_G_CLEAR;
+        let north_west = (bb << 15) & FILE_H_CLEAR;
+
+        north_east
+            | east_north
+            | east_south
+            | south_east
+            | south_west
+            | west_north
+            | west_north
+            | north_west
+    }
+
+    pub(crate) fn king_moves(pos: Position) -> Self {
+        let bb = Self::new().with_one(pos);
+        let north = (bb << 8);
+        let north_east = (bb << 7) & FILE_A_CLEAR;
+        let east = (bb << 1) & FILE_A_CLEAR;
+        let south_east = (bb >> 7) & FILE_A_CLEAR;
+        let south = (bb >> 8);
+        let south_west = (bb >> 9) & FILE_H_CLEAR;
+        let west = (bb >> 1) & FILE_H_CLEAR;
+        let north_west = (bb << )
+
+        north | east | south | west
+    }
+
+    pub fn mask_file(&self, file: File) -> Self {
+        *self
+            & match file {
+                File::A => FILE_A_MASK,
+                File::B => FILE_B_MASK,
+                File::C => FILE_C_MASK,
+                File::D => FILE_D_MASK,
+                File::E => FILE_E_MASK,
+                File::F => FILE_F_MASK,
+                File::G => FILE_G_MASK,
+                File::H => FILE_H_MASK,
+            }
+    }
+
+    pub fn clear_file(&self, file: File) -> Self {
+        *self
+            & match file {
+                File::A => FILE_A_CLEAR,
+                File::B => FILE_B_CLEAR,
+                File::C => FILE_C_CLEAR,
+                File::D => FILE_D_CLEAR,
+                File::E => FILE_E_CLEAR,
+                File::F => FILE_F_CLEAR,
+                File::G => FILE_G_CLEAR,
+                File::H => FILE_H_CLEAR,
+            }
+    }
+
+    pub fn mask_rank(&self, rank: Rank) -> Self {
+        *self
+            & match rank {
+                Rank::First => RANK_1_MASK,
+                Rank::Second => RANK_2_MASK,
+                Rank::Third => RANK_3_MASK,
+                Rank::Fourth => RANK_4_MASK,
+                Rank::Fifth => RANK_5_MASK,
+                Rank::Sixth => RANK_6_MASK,
+                Rank::Seventh => RANK_7_MASK,
+                Rank::Eighth => RANK_8_MASK,
+            }
+    }
+
+    pub fn clear_rank(&self, rank: Rank) -> Self {
+        *self
+            & match rank {
+                Rank::First => RANK_1_CLEAR,
+                Rank::Second => RANK_2_CLEAR,
+                Rank::Third => RANK_3_CLEAR,
+                Rank::Fourth => RANK_4_CLEAR,
+                Rank::Fifth => RANK_5_CLEAR,
+                Rank::Sixth => RANK_6_CLEAR,
+                Rank::Seventh => RANK_7_CLEAR,
+                Rank::Eighth => RANK_8_CLEAR,
+            }
     }
 
     pub(crate) fn is_nonzero(&self) -> bool {
@@ -283,20 +472,20 @@ impl Bitboard {
     }
 
     pub fn set_bit(&mut self, pos: Position) {
-        let bit_index = Self::get_bit_index(pos);
+        let bit_index = get_bit_index(pos);
         dbg!(bit_index);
 
         let bit_to_set = 1_u64 << bit_index;
         self.0 = self.data() | bit_to_set;
     }
+}
 
-    fn get_bit_index(pos: Position) -> u64 {
-        let file = u64::from(pos.file()) - 1;
-        let rank = u64::from(pos.rank()) - 1;
+fn get_bit_index(pos: Position) -> u64 {
+    let file = u64::from(pos.file()) - 1;
+    let rank = u64::from(pos.rank()) - 1;
 
-        let nth_bit = (8 * rank) + file;
-        nth_bit
-    }
+    let nth_bit = (8 * rank) + file;
+    nth_bit
 }
 
 impl AsRef<u64> for Bitboard {
@@ -310,6 +499,14 @@ impl Deref for Bitboard {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Not for Bitboard {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self::new_with_data(!self.data())
     }
 }
 
@@ -342,6 +539,22 @@ impl BitAndAssign for Bitboard {
     }
 }
 
+impl Shr<u64> for Bitboard {
+    type Output = Self;
+
+    fn shr(self, rhs: u64) -> Self::Output {
+        Self(self.data().shr(rhs))
+    }
+}
+
+impl Shl<u64> for Bitboard {
+    type Output = Self;
+
+    fn shl(self, rhs: u64) -> Self::Output {
+        Self(self.data().shl(rhs))
+    }
+}
+
 impl Debug for Bitboard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let binary = format!("{:064b}", self.data());
@@ -355,6 +568,12 @@ impl Debug for Bitboard {
         }
 
         write!(f, "{}", output.join("\n"))
+    }
+}
+
+impl From<Position> for Bitboard {
+    fn from(value: Position) -> Self {
+        Self::new().with_one(value)
     }
 }
 
@@ -545,5 +764,19 @@ mod tests {
             Some(Piece::new(Color::Black, PieceType::Pawn))
         );
         assert_eq!(b.get_piece(A6), None);
+    }
+
+    #[test]
+    fn knight_moves_test() {
+        let b = ChessBoard::new();
+        assert_eq!(
+            b.knight_moves(Color::White, A1),
+            Bitboard::new().with_one(B3)
+        );
+
+        assert_eq!(
+            b.knight_moves(Color::White, B1),
+            Bitboard::new().with_multiple(&[A3, C3])
+        )
     }
 }
