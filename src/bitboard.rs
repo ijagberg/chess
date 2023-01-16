@@ -254,7 +254,11 @@ impl ChessBoard {
     }
 
     pub fn king_moves(&self, color: Color, pos: Position) -> Bitboard {
-        todo!()
+        Bitboard::king_moves(pos)
+            & match color {
+                Color::Black => !self.black_pieces,
+                Color::White => !self.white_pieces,
+            }
     }
 }
 
@@ -306,15 +310,15 @@ impl Bitboard {
     pub(crate) fn king_moves(pos: Position) -> Self {
         let bb = Self::new().with_one(pos);
         let north = (bb << 8);
-        let north_east = (bb << 7) & FILE_A_CLEAR;
+        let north_east = (bb << 9) & FILE_A_CLEAR;
         let east = (bb << 1) & FILE_A_CLEAR;
         let south_east = (bb >> 7) & FILE_A_CLEAR;
         let south = (bb >> 8);
         let south_west = (bb >> 9) & FILE_H_CLEAR;
         let west = (bb >> 1) & FILE_H_CLEAR;
-        let north_west = (bb << )
+        let north_west = (bb << 7) & FILE_H_CLEAR;
 
-        north | east | south | west
+        north | north_east | east | south_east | south | south_west | west | north_west
     }
 
     pub fn mask_file(&self, file: File) -> Self {
@@ -473,7 +477,6 @@ impl Bitboard {
 
     pub fn set_bit(&mut self, pos: Position) {
         let bit_index = get_bit_index(pos);
-        dbg!(bit_index);
 
         let bit_to_set = 1_u64 << bit_index;
         self.0 = self.data() | bit_to_set;
@@ -567,7 +570,7 @@ impl Debug for Bitboard {
             output.push(line);
         }
 
-        write!(f, "{}", output.join("\n"))
+        write!(f, "bitboard:\n{}", output.join("\n"))
     }
 }
 
@@ -778,5 +781,15 @@ mod tests {
             b.knight_moves(Color::White, B1),
             Bitboard::new().with_multiple(&[A3, C3])
         )
+    }
+
+    #[test]
+    fn king_moves_test() {
+        let b = ChessBoard::new();
+        assert_eq!(b.king_moves(Color::White, E1), Bitboard::new());
+        assert_eq!(
+            b.king_moves(Color::White, E3),
+            Bitboard::new().with_multiple(&[D3, D4, E4, F4, F3])
+        );
     }
 }
