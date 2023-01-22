@@ -1,19 +1,21 @@
+use bitboard::Position;
+
 use crate::{
-    bitboard::ChessBoard,
+    chess_board::ChessBoard,
     chess_move::{ChessMove, MoveManager},
-    Board, Color, Position,
+    Color,
 };
 
 pub struct Game {
     current_player: Color,
     move_manager: MoveManager,
-    board: Board,
+    board: ChessBoard,
     bitboard: ChessBoard,
 }
 
 impl Game {
     pub fn new() -> Self {
-        let board = Board::default();
+        let board = ChessBoard::new();
         let current_player = Color::White;
         let mut move_manager = MoveManager::new(&board);
         move_manager.evaluate_legal_moves(&board, current_player);
@@ -25,7 +27,7 @@ impl Game {
         }
     }
 
-    pub fn board(&self) -> &Board {
+    pub fn board(&self) -> &ChessBoard {
         &self.board
     }
 
@@ -79,11 +81,11 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
-    use crate::{board, chess_move::PromotionPiece, Color::*};
-    use crate::{prelude::*, Position};
+    use crate::prelude::*;
+    use crate::{chess_move::PromotionPiece, Color::*};
+    use bitboard::*;
+    use std::collections::HashSet;
 
     #[test]
     fn make_move() {

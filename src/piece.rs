@@ -25,6 +25,14 @@ impl Piece {
         self.color() == color
     }
 
+    pub fn white(kind: PieceType) -> Self {
+        Self::new(Color::White, kind)
+    }
+
+    pub fn black(kind: PieceType) -> Self {
+        Self::new(Color::Black, kind)
+    }
+
     pub fn pawn(color: Color) -> Self {
         Self::new(color, Pawn)
     }
