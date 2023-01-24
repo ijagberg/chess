@@ -12,7 +12,7 @@ use std::ops::Shl;
 use std::ops::Shr;
 use std::{fmt::Debug, ops::BitOr};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ChessBoard {
     white_kings: Bitboard,
     black_kings: Bitboard,
@@ -86,6 +86,17 @@ impl ChessBoard {
             black_pieces,
             all_pieces,
         })
+    }
+
+    pub fn full_occupancy(&self) -> Bitboard {
+        self.all_pieces
+    }
+
+    pub fn get_occupancy_for_color(&self, color: Color) -> Bitboard {
+        match color {
+            Color::Black => self.black_pieces,
+            Color::White => self.white_pieces,
+        }
     }
 
     fn get_bitboard(&mut self, color: Color, kind: PieceType) -> &mut Bitboard {
