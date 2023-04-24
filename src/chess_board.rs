@@ -139,6 +139,8 @@ impl ChessBoard {
 
         let taken = self.take_piece(pos);
 
+        self.all_pieces |= pos;
+
         match piece.kind() {
             Pawn => self.all_pawns |= pos,
             Knight => self.all_knights |= pos,

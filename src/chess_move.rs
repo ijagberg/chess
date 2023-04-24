@@ -174,7 +174,7 @@ impl MoveManager {
             ChessMove::Regular { from, to } => {
                 let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
-                println!("{} takes {:?}", piece, taken);
+                print!(" {:?} takes {:?}", piece.kind(), taken);
                 if let Piece {
                     color,
                     kind: PieceType::King,
@@ -237,6 +237,7 @@ impl MoveManager {
         let mut legal_moves = Vec::with_capacity(60);
         for pos in board.get_occupancy_for_color(player).positions() {
             let mut legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
+            println!("naive legal moves from {pos}: {:?}", legal_moves_from_pos);
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
@@ -346,11 +347,11 @@ impl MoveManager {
         }
     }
 
-    fn is_under_attack(&self, board: &ChessBoard, target: Position, color: Color) -> bool {
+    fn is_under_attack(&self, board: &ChessBoard, target: Position, attacker_color: Color) -> bool {
         use Color::*;
         use PieceType::*;
 
-        self.get_attackers(board, target, color) > 0
+        self.get_attackers(board, target, attacker_color) > 0
     }
 
     fn get_attackers(
@@ -438,6 +439,8 @@ impl MoveManager {
                 };
             }
         }
+
+        println!("no piece on {from}");
         Vec::new()
     }
 
@@ -449,7 +452,7 @@ impl MoveManager {
     ) -> Vec<ChessMove> {
         if from.rank() == Rank::One || from.rank() == Rank::Eight {
             // TODO: mark this as an error somehow?
-            // There should never be a pawn on the first or eighthranks.
+            // There should never be a pawn on the first or eighth ranks.
             return Vec::new();
         }
         match player {
@@ -463,107 +466,54 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
     ) -> Vec<ChessMove> {
-        let targets =
-            Bitboard::white_pawn_targets(from, board.get_occupancy_for_color(Color::Black))
-                & !board.get_occupancy_for_color(Color::White);
         let mut legal_moves = Vec::with_capacity(10);
-        for to in targets.positions() {
-            legal_moves.push(ChessMove::Regular { from, to });
-        }
+        if from.rank() == Rank::Seven {
+            // from here it's only possible to promote
 
-        // en passant
-        if from.rank() == Rank::Five {
-            if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
-                let left_file = from.file().left();
-                let right_file = from.file().right();
-                for file in [left_file, right_file].iter().filter_map(|&f| f) {
-                    if f == Position::new(file, Rank::Seven) && t == Position::new(file, Rank::Five)
-                    {
-                        legal_moves.push(ChessMove::EnPassant {
-                            from,
-                            to: Position::new(file, Rank::Six),
-                            taken_index: Position::new(file, Rank::Five),
-                            taken_original_index: Position::new(file, Rank::Seven),
-                        });
+            // check position in front
+            let up = from.up().unwrap();
+            if !board.has_piece_at(up) {
+                legal_moves.append(&mut ChessMove::promotion_moves(from, up));
+            }
+            if let Some(up_left) = from.up_left() {
+                if board.has_piece_of_color_at(Color::Black, up_left) {
+                    legal_moves.append(&mut ChessMove::promotion_moves(from, up_left));
+                }
+            }
+            if let Some(up_right) = from.up_right() {
+                if board.has_piece_of_color_at(Color::Black, up_right) {
+                    legal_moves.append(&mut ChessMove::promotion_moves(from, up_right));
+                }
+            }
+        } else {
+            let targets =
+                Bitboard::white_pawn_targets(from, board.get_occupancy_for_color(Color::Black))
+                    & !board.get_occupancy_for_color(Color::White);
+            for to in targets.positions() {
+                legal_moves.push(ChessMove::Regular { from, to });
+            }
+
+            // en passant
+            if from.rank() == Rank::Five {
+                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
+                    let left_file = from.file().left();
+                    let right_file = from.file().right();
+                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
+                        if f == Position::new(file, Rank::Seven)
+                            && t == Position::new(file, Rank::Five)
+                        {
+                            legal_moves.push(ChessMove::EnPassant {
+                                from,
+                                to: Position::new(file, Rank::Six),
+                                taken_index: Position::new(file, Rank::Five),
+                                taken_original_index: Position::new(file, Rank::Seven),
+                            });
+                        }
                     }
                 }
             }
         }
         legal_moves
-        // if from.rank() == Rank::Seven {
-        //     // from here it's only possible to promote
-
-        //     let mut moves = Vec::new();
-
-        //     // check position in front
-        //     let to = Position::new(from.file(), Rank::Eight);
-        //     if !board.has_piece_at(to) {
-        //         moves.append(&mut ChessMove::promotion_moves(from, to));
-        //     }
-
-        //     for to in [(-1, 1), (1, 1)]
-        //         .iter()
-        //         .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
-        //     {
-        //         if board.has_piece_with_color_at(to, Color::Black) {
-        //             moves.append(&mut ChessMove::promotion_moves(from, to));
-        //         }
-        //     }
-
-        //     return moves;
-        // } else {
-        //     let mut positions = Vec::new();
-
-        //     // regular moves, up rank since the pawn is white
-        //     let one_step_forward = from.add_offset(0, 1).unwrap();
-        //     if !board.has_piece_at(one_step_forward) {
-        //         positions.push(one_step_forward);
-        //         if from.rank() == Rank::Second {
-        //             let two_steps_forward = Position::new(from.file(), Rank::Fourth);
-        //             if !board.has_piece_at(two_steps_forward) {
-        //                 positions.push(two_steps_forward);
-        //             }
-        //         }
-        //     }
-
-        //     if let Some(front_left) = from.add_offset(-1, 1) {
-        //         if board.has_piece_with_color_at(front_left, Color::Black) {
-        //             positions.push(front_left);
-        //         }
-        //     }
-
-        //     if let Some(front_right) = from.add_offset(1, 1) {
-        //         if board.has_piece_with_color_at(front_right, Color::Black) {
-        //             positions.push(front_right);
-        //         }
-        //     }
-
-        //     let mut legal_moves: Vec<ChessMove> = positions
-        //         .into_iter()
-        //         .map(|to| ChessMove::Regular { from, to })
-        //         .collect();
-
-        //     if from.rank() == Rank::Fifth {
-        //         if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
-        //             let left_file = from.file().add_offset(-1);
-        //             let right_file = from.file().add_offset(1);
-        //             for file in [left_file, right_file].iter().filter_map(|&f| f) {
-        //                 if f == Position::new(file, Rank::Seventh)
-        //                     && t == Position::new(file, Rank::Fifth)
-        //                 {
-        //                     legal_moves.push(ChessMove::EnPassant {
-        //                         from,
-        //                         to: Position::new(file, Rank::Sixth),
-        //                         taken_index: Position::new(file, Rank::Fifth),
-        //                         taken_original_index: Position::new(file, Rank::Seventh),
-        //                     });
-        //                 }
-        //             }
-        //         }
-        //     }
-
-        //     legal_moves
-        // }
     }
 
     fn evaluate_legal_black_pawn_moves_from(
@@ -571,81 +521,54 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
     ) -> Vec<ChessMove> {
-        todo!()
-        // if from.rank() == Rank::Second {
-        //     // from here it's only possible to promote
+        let mut legal_moves = Vec::with_capacity(10);
+        if from.rank() == Rank::Two {
+            // from here it's only possible to promote
 
-        //     let mut moves = Vec::new();
+            // check position in front
+            let down = from.down().unwrap();
+            if !board.has_piece_at(down) {
+                legal_moves.append(&mut ChessMove::promotion_moves(from, down));
+            }
+            if let Some(down_left) = from.down_left() {
+                if board.has_piece_of_color_at(Color::White, down_left) {
+                    legal_moves.append(&mut ChessMove::promotion_moves(from, down_left));
+                }
+            }
+            if let Some(down_right) = from.down_right() {
+                if board.has_piece_of_color_at(Color::White, down_right) {
+                    legal_moves.append(&mut ChessMove::promotion_moves(from, down_right));
+                }
+            }
+        } else {
+            let targets =
+                Bitboard::black_pawn_targets(from, board.get_occupancy_for_color(Color::White))
+                    & !board.get_occupancy_for_color(Color::Black);
+            for to in targets.positions() {
+                legal_moves.push(ChessMove::Regular { from, to });
+            }
 
-        //     // check position in front
-        //     let to = Position::new(from.file(), Rank::First);
-        //     if !board.has_piece_at(to) {
-        //         moves.append(&mut ChessMove::promotion_moves(from, to));
-        //     }
-
-        //     for to in [(-1, -1), (1, -1)]
-        //         .iter()
-        //         .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
-        //     {
-        //         if board.has_piece_with_color_at(to, Color::White) {
-        //             moves.append(&mut ChessMove::promotion_moves(from, to));
-        //         }
-        //     }
-
-        //     return moves;
-        // } else {
-        //     let mut positions = Vec::new();
-
-        //     // regular moves, up rank since the pawn is white
-        //     let one_step_forward = from.add_offset(0, -1).unwrap();
-        //     if !board.has_piece_at(one_step_forward) {
-        //         positions.push(one_step_forward);
-        //         if from.rank() == Rank::Seventh {
-        //             let two_steps_forward = Position::new(from.file(), Rank::Fifth);
-        //             if !board.has_piece_at(two_steps_forward) {
-        //                 positions.push(two_steps_forward);
-        //             }
-        //         }
-        //     }
-
-        //     if let Some(front_left) = from.add_offset(1, -1) {
-        //         if board.has_piece_with_color_at(front_left, Color::White) {
-        //             positions.push(front_left);
-        //         }
-        //     }
-
-        //     if let Some(front_right) = from.add_offset(-1, -1) {
-        //         if board.has_piece_with_color_at(front_right, Color::White) {
-        //             positions.push(front_right);
-        //         }
-        //     }
-
-        //     let mut legal_moves: Vec<ChessMove> = positions
-        //         .into_iter()
-        //         .map(|to| ChessMove::Regular { from, to })
-        //         .collect();
-
-        //     if from.rank() == Rank::Fourth {
-        //         if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
-        //             let left_file = from.file().add_offset(-1);
-        //             let right_file = from.file().add_offset(1);
-        //             for file in [left_file, right_file].iter().filter_map(|&f| f) {
-        //                 if f == Position::new(file, Rank::Second)
-        //                     && t == Position::new(file, Rank::Fourth)
-        //                 {
-        //                     legal_moves.push(ChessMove::EnPassant {
-        //                         from,
-        //                         to: Position::new(file, Rank::Third),
-        //                         taken_index: Position::new(file, Rank::Fourth),
-        //                         taken_original_index: Position::new(file, Rank::Second),
-        //                     });
-        //                 }
-        //             }
-        //         }
-        //     }
-
-        //     legal_moves
-        // }
+            // en passant
+            if from.rank() == Rank::Four {
+                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
+                    let left_file = from.file().left();
+                    let right_file = from.file().right();
+                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
+                        if f == Position::new(file, Rank::Two)
+                            && t == Position::new(file, Rank::Four)
+                        {
+                            legal_moves.push(ChessMove::EnPassant {
+                                from,
+                                to: Position::new(file, Rank::Three),
+                                taken_index: Position::new(file, Rank::Four),
+                                taken_original_index: Position::new(file, Rank::Two),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        legal_moves
     }
 
     fn evaluate_legal_king_moves_from(
@@ -663,29 +586,37 @@ impl MoveManager {
             .collect();
 
         match (player, from) {
-            (Color::Black, E8) => legal_moves.append(&mut self.evaluate_black_castle(board)),
-            (Color::White, E1) => legal_moves.append(&mut self.evaluate_white_castle(board)),
+            (Color::Black, E8) => {
+                if let Some(mut castle_moves) = self.evaluate_black_castle(board) {
+                    legal_moves.append(&mut castle_moves);
+                }
+            }
+            (Color::White, E1) => {
+                if let Some(mut castle_moves) = self.evaluate_white_castle(board) {
+                    legal_moves.append(&mut castle_moves);
+                }
+            }
             _ => {}
         }
-
         legal_moves
     }
 
-    fn evaluate_white_castle(&self, board: &ChessBoard) -> Vec<ChessMove> {
+    fn evaluate_white_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
         use bitboard::*;
         // has king moved?
         if self.history_contains_from_position(E1) {
-            return Vec::new();
+            dbg!("white king has moved");
+            return None;
         }
 
-        let mut moves = Vec::new();
+        let mut moves = Vec::with_capacity(2);
 
         // check short castle
-        if !self.history_contains_from_position(H1)
-            && !board.has_piece_at(F1)
-            && !board.has_piece_at(G1)
-            && !self.is_under_attack(board, F1, Color::White)
-            && !self.is_under_attack(board, G1, Color::White)
+        if !dbg!(self.history_contains_from_position(H1))
+            && !dbg!(board.has_piece_at(F1))
+            && !dbg!(board.has_piece_at(G1))
+            && !dbg!(self.is_under_attack(board, F1, Color::Black))
+            && !dbg!(self.is_under_attack(board, G1, Color::Black))
         {
             moves.push(ChessMove::Castle {
                 rook_from: H1,
@@ -700,9 +631,9 @@ impl MoveManager {
             && !board.has_piece_at(D1)
             && !board.has_piece_at(C1)
             && !board.has_piece_at(B1)
-            && !self.is_under_attack(board, D1, Color::White)
-            && !self.is_under_attack(board, C1, Color::White)
-            && !self.is_under_attack(board, B1, Color::White)
+            && !self.is_under_attack(board, D1, Color::Black)
+            && !self.is_under_attack(board, C1, Color::Black)
+            && !self.is_under_attack(board, B1, Color::Black)
         {
             moves.push(ChessMove::Castle {
                 rook_from: A1,
@@ -712,51 +643,53 @@ impl MoveManager {
             })
         }
 
-        return moves;
+        return Some(moves);
     }
 
-    fn evaluate_black_castle(&self, board: &ChessBoard) -> Vec<ChessMove> {
-        todo!()
-        // // has king moved?
-        // if self.history_contains_from_position(E8) {
-        //     return Vec::new();
-        // }
+    fn evaluate_black_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
+        use bitboard::*;
 
-        // let mut moves = Vec::new();
+        // has king moved?
+        if self.history_contains_from_position(E8) {
+            dbg!("black king has moved");
+            return None;
+        }
 
-        // // check short castle
-        // if !self.history_contains_from_position(H8)
-        //     && !board.has_piece_at(F8)
-        //     && !board.has_piece_at(G8)
-        //     && !self.is_under_attack(board, F8, Color::Black).is_some()
-        //     && !self.is_under_attack(board, G8, Color::Black).is_some()
-        // {
-        //     moves.push(ChessMove::Castle {
-        //         rook_from: H8,
-        //         rook_to: F8,
-        //         king_from: E8,
-        //         king_to: G8,
-        //     });
-        // }
+        let mut moves = Vec::with_capacity(2);
 
-        // // check long castle
-        // if !self.history_contains_from_position(A8)
-        //     && !board.has_piece_at(D8)
-        //     && !board.has_piece_at(C8)
-        //     && !board.has_piece_at(B8)
-        //     && !self.is_under_attack(board, D8, Color::Black).is_some()
-        //     && !self.is_under_attack(board, C8, Color::Black).is_some()
-        //     && !self.is_under_attack(board, B8, Color::Black).is_some()
-        // {
-        //     moves.push(ChessMove::Castle {
-        //         rook_from: A8,
-        //         rook_to: D8,
-        //         king_from: E8,
-        //         king_to: C8,
-        //     })
-        // }
+        // check short castle
+        if !self.history_contains_from_position(H8)
+            && !board.has_piece_at(F8)
+            && !board.has_piece_at(G8)
+            && !self.is_under_attack(board, F8, Color::White)
+            && !self.is_under_attack(board, G8, Color::White)
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: H8,
+                rook_to: F8,
+                king_from: E8,
+                king_to: G8,
+            });
+        }
 
-        // return moves;
+        // check long castle
+        if !self.history_contains_from_position(A8)
+            && !board.has_piece_at(D8)
+            && !board.has_piece_at(C8)
+            && !board.has_piece_at(B8)
+            && !self.is_under_attack(board, D8, Color::White)
+            && !self.is_under_attack(board, C8, Color::White)
+            && !self.is_under_attack(board, B8, Color::White)
+        {
+            moves.push(ChessMove::Castle {
+                rook_from: A8,
+                rook_to: D8,
+                king_from: E8,
+                king_to: C8,
+            })
+        }
+
+        return Some(moves);
     }
 
     fn evaluate_legal_knight_moves_from(
@@ -806,32 +739,11 @@ impl MoveManager {
     ) -> Vec<ChessMove> {
         let targets = Bitboard::bishop_targets(from, board.full_occupancy())
             & !board.get_occupancy_for_color(player);
-        dbg!(targets);
         let mut legal_moves = Vec::with_capacity(16);
         for to in targets.positions() {
             legal_moves.push(ChessMove::Regular { from, to })
         }
         legal_moves
-        // let mut positions = Vec::new();
-
-        // let mut up_file_up_rank = self.step_until_collision(from, 1, 1, board, player);
-        // positions.append(&mut up_file_up_rank);
-
-        // let mut up_file_down_rank = self.step_until_collision(from, 1, -1, board, player);
-        // positions.append(&mut up_file_down_rank);
-
-        // let mut down_file_up_rank = self.step_until_collision(from, -1, 1, board, player);
-        // positions.append(&mut down_file_up_rank);
-
-        // let mut down_file_down_rank = self.step_until_collision(from, -1, -1, board, player);
-        // positions.append(&mut down_file_down_rank);
-
-        // let legal_moves = positions
-        //     .into_iter()
-        //     .map(|to| ChessMove::Regular { from, to })
-        //     .collect();
-
-        // legal_moves
     }
 
     fn evaluate_legal_rook_moves_from(
@@ -878,8 +790,6 @@ impl MoveManager {
     ) -> Vec<ChessMove> {
         let targets = Bitboard::queen_targets(from, board.full_occupancy())
             & !board.get_occupancy_for_color(player);
-
-        dbg!(targets);
         let mut legal_moves = Vec::with_capacity(16);
         for to in targets.positions() {
             legal_moves.push(ChessMove::Regular { from, to })
@@ -920,10 +830,12 @@ mod tests {
         assert_eq!(
             legal_moves,
             vec![
+                (B1, A3),
+                (B1, C3),
+                (G1, F3),
+                (G1, H3),
                 (A2, A3),
                 (A2, A4),
-                (B1, C3),
-                (B1, A3),
                 (B2, B3),
                 (B2, B4),
                 (C2, C3),
@@ -934,8 +846,6 @@ mod tests {
                 (E2, E4),
                 (F2, F3),
                 (F2, F4),
-                (G1, H3),
-                (G1, F3),
                 (G2, G3),
                 (G2, G4),
                 (H2, H3),
@@ -1014,10 +924,5 @@ mod tests {
             queen_moves_from_a4,
             vec![A3, B3, B4, C4, D4, E4, F4, G4, H4, A5, B5, A6, C6, A7, D7]
         );
-    }
-
-    #[test]
-    fn is_under_attack_by_bishop() {
-        assert!(false);
     }
 }
