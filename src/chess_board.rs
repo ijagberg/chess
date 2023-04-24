@@ -99,7 +99,24 @@ impl ChessBoard {
         }
     }
 
-    fn get_bitboard(&mut self, color: Color, kind: PieceType) -> &mut Bitboard {
+    pub fn get_bitboard(&self, color: Color, kind: PieceType) -> Bitboard {
+        match (color, kind) {
+            (Color::Black, PieceType::Pawn) => self.black_pawns,
+            (Color::Black, PieceType::Knight) => self.black_knights,
+            (Color::Black, PieceType::Bishop) => self.black_bishops,
+            (Color::Black, PieceType::Rook) => self.black_rooks,
+            (Color::Black, PieceType::Queen) => self.black_queens,
+            (Color::Black, PieceType::King) => self.black_kings,
+            (Color::White, PieceType::Pawn) => self.white_pawns,
+            (Color::White, PieceType::Knight) => self.white_knights,
+            (Color::White, PieceType::Bishop) => self.white_bishops,
+            (Color::White, PieceType::Rook) => self.white_rooks,
+            (Color::White, PieceType::Queen) => self.white_queens,
+            (Color::White, PieceType::King) => self.white_kings,
+        }
+    }
+
+    fn get_bitboard_mut(&mut self, color: Color, kind: PieceType) -> &mut Bitboard {
         match (color, kind) {
             (Color::Black, PieceType::Pawn) => &mut self.black_pawns,
             (Color::Black, PieceType::Knight) => &mut self.black_knights,
@@ -117,10 +134,45 @@ impl ChessBoard {
     }
 
     pub fn set_piece(&mut self, pos: Position, piece: Piece) -> Option<Piece> {
+        use Color::*;
+        use PieceType::*;
+
         let taken = self.take_piece(pos);
 
-        let bb = self.get_bitboard(piece.color(), piece.kind());
-        *bb |= pos;
+        match piece.kind() {
+            Pawn => self.all_pawns |= pos,
+            Knight => self.all_knights |= pos,
+            Bishop => self.all_bishops |= pos,
+            Rook => self.all_rooks |= pos,
+            Queen => self.all_queens |= pos,
+            King => self.all_kings |= pos,
+        }
+
+        match piece.color() {
+            Black => {
+                self.black_pieces |= pos;
+                match piece.kind() {
+                    Pawn => self.black_pawns |= pos,
+                    Knight => self.black_knights |= pos,
+                    Bishop => self.black_bishops |= pos,
+                    Rook => self.black_rooks |= pos,
+                    Queen => self.black_queens |= pos,
+                    King => self.black_kings |= pos,
+                }
+            }
+            White => {
+                self.white_pieces |= pos;
+                match piece.kind() {
+                    Pawn => self.white_pawns |= pos,
+                    Knight => self.white_knights |= pos,
+                    Bishop => self.white_bishops |= pos,
+                    Rook => self.white_rooks |= pos,
+                    Queen => self.white_queens |= pos,
+                    King => self.white_kings |= pos,
+                }
+            }
+        }
+
         taken
     }
 
@@ -132,7 +184,7 @@ impl ChessBoard {
                 self.remove_known_piece(pos, color, kind);
                 return Some(taken);
             }
-            _ => panic!(),
+            (color, kind) => panic!("{:?}, {:?}", color, kind),
         }
     }
 

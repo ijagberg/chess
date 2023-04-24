@@ -87,3 +87,9 @@ pub enum PieceType {
     Queen,
     King,
 }
+
+impl PieceType {
+    pub fn all_iter() -> impl Iterator<Item = Self> {
+        [Pawn, Knight, Bishop, Rook, Queen, King].iter().copied()
+    }
+}

@@ -174,6 +174,7 @@ impl MoveManager {
             ChessMove::Regular { from, to } => {
                 let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
+                println!("{} takes {:?}", piece, taken);
                 if let Piece {
                     color,
                     kind: PieceType::King,
@@ -264,6 +265,7 @@ impl MoveManager {
         }
 
         if let Some((player, chess_move, taken_piece)) = self.history.pop() {
+            println!("undoing move {:?} for player {}", chess_move, player);
             match chess_move {
                 ChessMove::Regular { from, to } => {
                     let moved_piece = board.take_piece(to).unwrap();
@@ -326,19 +328,17 @@ impl MoveManager {
     fn is_in_check(&self, board: &ChessBoard, player: Color) -> bool {
         match player {
             Color::Black => {
-                if let Some((pos, piece)) =
-                    self.is_under_attack(board, self.black_king, Color::Black)
-                {
-                    println!("black is in check by {:?} on {:?}", piece, pos);
+                let attackers = self.get_attackers(board, self.black_king, Color::White);
+                if attackers > 0 {
+                    println!("black king is in check, attackers: {}", attackers);
                     return true;
                 }
                 false
             }
             Color::White => {
-                if let Some((pos, piece)) =
-                    self.is_under_attack(board, self.white_king, Color::White)
-                {
-                    println!("white is in check by {:?} on {:?}", piece, pos);
+                let attackers = self.get_attackers(board, self.white_king, Color::Black);
+                if attackers > 0 {
+                    println!("white king is in check, attackers: {}", attackers);
                     return true;
                 }
                 false
@@ -346,13 +346,78 @@ impl MoveManager {
         }
     }
 
-    fn is_under_attack(
+    fn is_under_attack(&self, board: &ChessBoard, target: Position, color: Color) -> bool {
+        use Color::*;
+        use PieceType::*;
+
+        self.get_attackers(board, target, color) > 0
+    }
+
+    fn get_attackers(
         &self,
         board: &ChessBoard,
         target: Position,
-        color: Color,
-    ) -> Option<(Position, Piece)> {
-        todo!()
+        attacker_color: Color,
+    ) -> Bitboard {
+        use Color::*;
+        use PieceType::*;
+
+        let mut attacker_bb = Bitboard::empty();
+        for piece_type in PieceType::all_iter() {
+            attacker_bb |= match (attacker_color, piece_type) {
+                (Black, Pawn) => {
+                    (Position::up_left(&target)
+                        .map(|p| Bitboard::with_one(p))
+                        .unwrap_or(Bitboard::empty())
+                        | Position::up_right(&target)
+                            .map(|p| Bitboard::with_one(p))
+                            .unwrap_or(Bitboard::empty()))
+                        & board.get_bitboard(Black, Pawn)
+                }
+                (Black, Knight) => {
+                    Bitboard::knight_targets(target) & board.get_bitboard(Black, Knight)
+                }
+                (Black, Bishop) => {
+                    Bitboard::bishop_targets(target, board.full_occupancy())
+                        & board.get_bitboard(Black, Bishop)
+                }
+                (Black, Rook) => {
+                    Bitboard::rook_targets(target, board.full_occupancy())
+                        & board.get_bitboard(Black, Rook)
+                }
+                (Black, Queen) => {
+                    Bitboard::queen_targets(target, board.full_occupancy())
+                        & board.get_bitboard(Black, Queen)
+                }
+                (Black, King) => Bitboard::king_targets(target) & board.get_bitboard(Black, King),
+                (White, Pawn) => {
+                    (Position::down_left(&target)
+                        .map(|p| Bitboard::with_one(p))
+                        .unwrap_or(Bitboard::empty())
+                        | Position::down_right(&target)
+                            .map(|p| Bitboard::with_one(p))
+                            .unwrap_or(Bitboard::empty()))
+                        & board.get_bitboard(White, Pawn)
+                }
+                (White, Knight) => {
+                    Bitboard::knight_targets(target) & board.get_bitboard(White, Knight)
+                }
+                (White, Bishop) => {
+                    Bitboard::bishop_targets(target, board.full_occupancy())
+                        & board.get_bitboard(White, Bishop)
+                }
+                (White, Rook) => {
+                    Bitboard::rook_targets(target, board.full_occupancy())
+                        & board.get_bitboard(White, Rook)
+                }
+                (White, Queen) => {
+                    Bitboard::queen_targets(target, board.full_occupancy())
+                        & board.get_bitboard(White, Queen)
+                }
+                (White, King) => Bitboard::king_targets(target) & board.get_bitboard(White, King),
+            }
+        }
+        attacker_bb
     }
 
     fn evaluate_legal_moves_from(
@@ -401,13 +466,30 @@ impl MoveManager {
         let targets =
             Bitboard::white_pawn_targets(from, board.get_occupancy_for_color(Color::Black))
                 & !board.get_occupancy_for_color(Color::White);
-        let mut legal_moves = Vec::with_capacity(4);
+        let mut legal_moves = Vec::with_capacity(10);
         for to in targets.positions() {
             legal_moves.push(ChessMove::Regular { from, to });
         }
 
         // en passant
-        todo!()
+        if from.rank() == Rank::Five {
+            if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
+                let left_file = from.file().left();
+                let right_file = from.file().right();
+                for file in [left_file, right_file].iter().filter_map(|&f| f) {
+                    if f == Position::new(file, Rank::Seven) && t == Position::new(file, Rank::Five)
+                    {
+                        legal_moves.push(ChessMove::EnPassant {
+                            from,
+                            to: Position::new(file, Rank::Six),
+                            taken_index: Position::new(file, Rank::Five),
+                            taken_original_index: Position::new(file, Rank::Seven),
+                        });
+                    }
+                }
+            }
+        }
+        legal_moves
         // if from.rank() == Rank::Seven {
         //     // from here it's only possible to promote
 
@@ -602,8 +684,8 @@ impl MoveManager {
         if !self.history_contains_from_position(H1)
             && !board.has_piece_at(F1)
             && !board.has_piece_at(G1)
-            && !self.is_under_attack(board, F1, Color::White).is_some()
-            && !self.is_under_attack(board, G1, Color::White).is_some()
+            && !self.is_under_attack(board, F1, Color::White)
+            && !self.is_under_attack(board, G1, Color::White)
         {
             moves.push(ChessMove::Castle {
                 rook_from: H1,
@@ -618,9 +700,9 @@ impl MoveManager {
             && !board.has_piece_at(D1)
             && !board.has_piece_at(C1)
             && !board.has_piece_at(B1)
-            && !self.is_under_attack(board, D1, Color::White).is_some()
-            && !self.is_under_attack(board, C1, Color::White).is_some()
-            && !self.is_under_attack(board, B1, Color::White).is_some()
+            && !self.is_under_attack(board, D1, Color::White)
+            && !self.is_under_attack(board, C1, Color::White)
+            && !self.is_under_attack(board, B1, Color::White)
         {
             moves.push(ChessMove::Castle {
                 rook_from: A1,
@@ -932,5 +1014,10 @@ mod tests {
             queen_moves_from_a4,
             vec![A3, B3, B4, C4, D4, E4, F4, G4, H4, A5, B5, A6, C6, A7, D7]
         );
+    }
+
+    #[test]
+    fn is_under_attack_by_bishop() {
+        assert!(false);
     }
 }

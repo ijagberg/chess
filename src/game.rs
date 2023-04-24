@@ -6,6 +6,7 @@ use crate::{
     Color,
 };
 
+#[derive(Debug)]
 pub struct Game {
     current_player: Color,
     move_manager: MoveManager,
@@ -111,6 +112,7 @@ mod tests {
     fn en_passant() {
         let mut game = setup_game_1();
 
+        dbg!(&game);
         game.make_move(ChessMove::EnPassant {
             from: E5,
             to: D6,
@@ -275,6 +277,7 @@ mod tests {
     /// Set up a game where en passant is possible
     fn setup_game_1() -> Game {
         let mut game = Game::new();
+        dbg!(&game);
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(H7, H6)).unwrap();
         game.make_move(regular(E4, E5)).unwrap();
