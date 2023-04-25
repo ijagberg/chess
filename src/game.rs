@@ -79,9 +79,11 @@ impl Game {
         } else {
             self.move_manager
                 .make_move(&mut self.board, self.current_player, chess_move);
+            dbg!("move was made", chess_move);
             self.current_player = self.current_player.opponent();
             self.move_manager
                 .evaluate_legal_moves(&self.board, self.current_player);
+
             Ok(())
         }
     }
@@ -173,6 +175,8 @@ mod tests {
     #[test]
     fn castle() {
         let mut game = setup_castle_game();
+
+        dbg!(&game.move_manager.legal_moves);
 
         game.make_move(ChessMove::Castle {
             rook_from: H1,
@@ -292,6 +296,7 @@ mod tests {
         game.make_move(regular(G5, F7)).unwrap();
         game.make_move(regular(E8, F7)).unwrap();
         game.make_move(regular(E4, G5)).unwrap();
+        dbg!(&game.move_manager.legal_moves);
         game.make_move(regular(F7, G8)).unwrap();
         game.make_move(regular(G5, E6)).unwrap();
         game.make_move(regular(D8, E8)).unwrap();

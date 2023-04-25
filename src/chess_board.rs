@@ -63,7 +63,7 @@ impl ChessBoard {
             black_kings | black_queens | black_rooks | black_knights | black_bishops | black_pawns;
         let all_pieces = white_pieces | black_pieces;
 
-        dbg!(Self {
+        Self {
             white_kings,
             black_kings,
             all_kings,
@@ -85,7 +85,7 @@ impl ChessBoard {
             white_pieces,
             black_pieces,
             all_pieces,
-        })
+        }
     }
 
     pub fn full_occupancy(&self) -> Bitboard {

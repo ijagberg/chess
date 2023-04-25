@@ -1,5 +1,5 @@
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
-use bitboard::{Bitboard, Position, Rank, INCREASING};
+use bitboard::{Bitboard, Position, Rank, INCREASING_A1_A2};
 use std::option::Option;
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
@@ -155,7 +155,7 @@ impl PromotionPiece {
 #[derive(Debug)]
 pub(crate) struct MoveManager {
     history: Vec<(Color, ChessMove, Option<Piece>)>,
-    legal_moves: Vec<ChessMove>,
+    pub(crate) legal_moves: Vec<ChessMove>,
     black_king: Position,
     white_king: Position,
     en_passant_possible_for_white: Option<Position>,
@@ -166,7 +166,7 @@ impl MoveManager {
     pub(crate) fn new(board: &ChessBoard) -> Self {
         let mut white_king = None;
         let mut black_king = None;
-        for pos in INCREASING {
+        for pos in INCREASING_A1_A2 {
             if let Some(Piece {
                 color,
                 kind: PieceType::King,
@@ -198,8 +198,8 @@ impl MoveManager {
         self.legal_moves.contains(&chess_move)
     }
 
-    pub(crate) fn make_move(
-        &mut self,
+    pub(crate) fn dry_run_move(
+        &self,
         board: &mut ChessBoard,
         player: Color,
         chess_move: ChessMove,
@@ -209,21 +209,6 @@ impl MoveManager {
             ChessMove::Regular { from, to } => {
                 let piece = board.take_piece(from).unwrap();
                 let taken = board.set_piece(to, piece);
-                print!(" {:?} takes {:?}", piece.kind(), taken);
-                if let Piece {
-                    color,
-                    kind: PieceType::King,
-                } = piece
-                {
-                    match color {
-                        Color::Black => {
-                            self.black_king = to;
-                        }
-                        Color::White => {
-                            self.white_king = to;
-                        }
-                    }
-                }
                 taken_piece = taken;
             }
             ChessMove::EnPassant {
@@ -252,7 +237,6 @@ impl MoveManager {
                 king_from,
                 king_to,
             } => {
-                // dont forget to update king pos
                 let rook = board.take_piece(rook_from).unwrap();
                 board.set_piece(rook_to, rook);
                 let king = board.take_piece(king_from).unwrap();
@@ -260,7 +244,52 @@ impl MoveManager {
                 taken_piece = None;
             }
         }
+        taken_piece
+    }
+
+    pub(crate) fn make_move(
+        &mut self,
+        board: &mut ChessBoard,
+        player: Color,
+        chess_move: ChessMove,
+    ) -> Option<Piece> {
+        if let ChessMove::Regular { from, to } = chess_move {
+            if let Some(Piece {
+                color,
+                kind: PieceType::King,
+            }) = board.get_piece(from)
+            {
+                match color {
+                    Color::Black => self.black_king = to,
+                    Color::White => self.white_king = to,
+                }
+            }
+        }
+        if let ChessMove::Regular { from, to } = chess_move {
+            if let Some(Piece {
+                color,
+                kind: PieceType::Pawn,
+            }) = board.get_piece(from)
+            {
+                if from.file() == to.file() && from.manhattan_distance_to(to) == 2 {
+                    match color {
+                        Color::Black => {
+                            self.en_passant_possible_for_white =
+                                Some(Position::new(from.file(), from.rank().down().unwrap()));
+                        }
+                        Color::White => {
+                            self.en_passant_possible_for_black =
+                                Some(Position::new(from.file(), from.rank().up().unwrap()));
+                        }
+                    }
+                }
+            }
+        }
+
+        let taken_piece = self.dry_run_move(board, player, chess_move);
+
         self.history.push((player, chess_move, taken_piece));
+
         taken_piece
     }
 
@@ -272,22 +301,20 @@ impl MoveManager {
         let mut legal_moves = Vec::with_capacity(60);
         for pos in board.get_occupancy_for_color(player).positions() {
             let mut legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
-            println!("naive legal moves from {pos}: {:?}", legal_moves_from_pos);
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
         let mut actual_legal_moves = Vec::new();
-        let mut board_clone = board.clone();
         for &legal_move in &legal_moves {
+            let mut board_clone = board.clone();
             print!("testing move: {}, {:?}", player, legal_move);
-            self.make_move(&mut board_clone, player, legal_move);
+            self.dry_run_move(&mut board_clone, player, legal_move);
             if !self.is_in_check(&board_clone, player) {
                 println!(" LEGAL");
                 actual_legal_moves.push(legal_move);
             } else {
                 println!(" ILLEGAL");
             }
-            self.undo_last_move(&mut board_clone);
         }
 
         self.legal_moves = actual_legal_moves;
@@ -377,7 +404,11 @@ impl MoveManager {
     pub fn is_in_check(&self, board: &ChessBoard, player: Color) -> bool {
         match player {
             Color::Black => {
-                let attackers = self.get_attackers(board, self.black_king, Color::White);
+                let black_king = board
+                    .get_bitboard(Color::Black, PieceType::King)
+                    .first_position()
+                    .unwrap();
+                let attackers = self.get_attackers(board, black_king, Color::White);
                 if attackers > 0 {
                     println!("black king is in check, attackers: {}", attackers);
                     return true;
@@ -385,7 +416,13 @@ impl MoveManager {
                 false
             }
             Color::White => {
-                let attackers = self.get_attackers(board, self.white_king, Color::Black);
+                dbg!(board.get_bitboard(Color::White, PieceType::King));
+                let white_king = board
+                    .get_bitboard(Color::White, PieceType::King)
+                    .first_position()
+                    .unwrap();
+                dbg!(white_king);
+                let attackers = self.get_attackers(board, white_king, Color::Black);
                 if attackers > 0 {
                     println!("white king is in check, attackers: {}", attackers);
                     return true;
@@ -542,8 +579,8 @@ impl MoveManager {
             }
 
             // en passant
-            if from.rank() == Rank::Five {
-                if let Some(en_passant_target) = self.en_passant_possible_for_white {
+            if let t @ Some(en_passant_target) = self.en_passant_possible_for_white {
+                if from.rank() == Rank::Five && (from.up_left() == t || from.up_right() == t) {
                     legal_moves.push(ChessMove::EnPassant {
                         from,
                         to: en_passant_target,
@@ -589,22 +626,14 @@ impl MoveManager {
             }
 
             // en passant
-            if from.rank() == Rank::Four {
-                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
-                    let left_file = from.file().left();
-                    let right_file = from.file().right();
-                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
-                        if f == Position::new(file, Rank::Two)
-                            && t == Position::new(file, Rank::Four)
-                        {
-                            legal_moves.push(ChessMove::EnPassant {
-                                from,
-                                to: Position::new(file, Rank::Three),
-                                taken_index: Position::new(file, Rank::Four),
-                                taken_original_index: Position::new(file, Rank::Two),
-                            });
-                        }
-                    }
+            if let t @ Some(en_passant_target) = self.en_passant_possible_for_black {
+                if from.rank() == Rank::Four && (from.down_left() == t || from.down_right() == t) {
+                    legal_moves.push(ChessMove::EnPassant {
+                        from,
+                        to: en_passant_target,
+                        taken_original_index: Position::new(en_passant_target.file(), Rank::Two),
+                        taken_index: Position::new(en_passant_target.file(), Rank::Four),
+                    })
                 }
             }
         }
@@ -643,6 +672,7 @@ impl MoveManager {
 
     fn evaluate_white_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
         use bitboard::*;
+        dbg!("evaluating white castle");
         // has king moved?
         if self.history_contains_from_position(E1) {
             dbg!("white king has moved");
