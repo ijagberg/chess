@@ -1,5 +1,5 @@
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
-use bitboard::{Bitboard, Position, Rank, INCREASING_A1_A2};
+use bitboard::*;
 use std::option::Option;
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
@@ -156,39 +156,25 @@ impl PromotionPiece {
 pub(crate) struct MoveManager {
     history: Vec<(Color, ChessMove, Option<Piece>)>,
     pub(crate) legal_moves: Vec<ChessMove>,
-    black_king: Position,
-    white_king: Position,
     en_passant_possible_for_white: Option<Position>,
     en_passant_possible_for_black: Option<Position>,
+    white_kingside_castle: bool,
+    white_queenside_castle: bool,
+    black_kingside_castle: bool,
+    black_queenside_castle: bool,
 }
 
 impl MoveManager {
     pub(crate) fn new(board: &ChessBoard) -> Self {
-        let mut white_king = None;
-        let mut black_king = None;
-        for pos in INCREASING_A1_A2 {
-            if let Some(Piece {
-                color,
-                kind: PieceType::King,
-            }) = board.get_piece(pos)
-            {
-                match color {
-                    Color::Black => {
-                        black_king = Some(pos);
-                    }
-                    Color::White => {
-                        white_king = Some(pos);
-                    }
-                }
-            }
-        }
         let mut this = Self {
             history: vec![],
             legal_moves: vec![],
-            black_king: black_king.expect("no black king on board"),
-            white_king: white_king.expect("no white king on board"),
             en_passant_possible_for_white: None,
             en_passant_possible_for_black: None,
+            white_kingside_castle: true,
+            white_queenside_castle: true,
+            black_kingside_castle: true,
+            black_queenside_castle: true,
         };
 
         this
@@ -256,18 +242,6 @@ impl MoveManager {
         if let ChessMove::Regular { from, to } = chess_move {
             if let Some(Piece {
                 color,
-                kind: PieceType::King,
-            }) = board.get_piece(from)
-            {
-                match color {
-                    Color::Black => self.black_king = to,
-                    Color::White => self.white_king = to,
-                }
-            }
-        }
-        if let ChessMove::Regular { from, to } = chess_move {
-            if let Some(Piece {
-                color,
                 kind: PieceType::Pawn,
             }) = board.get_piece(from)
             {
@@ -283,6 +257,26 @@ impl MoveManager {
                         }
                     }
                 }
+            }
+            if from == E1 {
+                self.white_kingside_castle = false;
+                self.white_queenside_castle = false;
+            }
+            if from == A1 {
+                self.white_queenside_castle = false;
+            }
+            if from == A8 {
+                self.white_kingside_castle = false;
+            }
+            if from == E8 {
+                self.black_kingside_castle = false;
+                self.black_queenside_castle = false;
+            }
+            if from == A8 {
+                self.black_queenside_castle = false;
+            }
+            if from == H8 {
+                self.black_kingside_castle = false;
             }
         }
 
@@ -333,16 +327,7 @@ impl MoveManager {
                 ChessMove::Regular { from, to } => {
                     let moved_piece = board.take_piece(to).unwrap();
                     board.set_piece(from, moved_piece);
-                    if moved_piece.kind() == PieceType::King {
-                        match player {
-                            Color::Black => {
-                                self.black_king = from;
-                            }
-                            Color::White => {
-                                self.white_king = from;
-                            }
-                        }
-                    }
+
                     if moved_piece.kind() == PieceType::Pawn
                         && chess_move.is_regular()
                         && chess_move.from().manhattan_distance_to(chess_move.to()) == 2
@@ -673,16 +658,10 @@ impl MoveManager {
     fn evaluate_white_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
         use bitboard::*;
         dbg!("evaluating white castle");
-        // has king moved?
-        if self.history_contains_from_position(E1) {
-            dbg!("white king has moved");
-            return None;
-        }
-
         let mut moves = Vec::with_capacity(2);
 
         // check short castle
-        if !dbg!(self.history_contains_from_position(H1))
+        if dbg!(self.white_kingside_castle)
             && !dbg!(board.has_piece_at(F1))
             && !dbg!(board.has_piece_at(G1))
             && !dbg!(self.is_under_attack(board, F1, Color::Black))
@@ -697,7 +676,7 @@ impl MoveManager {
         }
 
         // check long castle
-        if !self.history_contains_from_position(A1)
+        if self.white_queenside_castle
             && !board.has_piece_at(D1)
             && !board.has_piece_at(C1)
             && !board.has_piece_at(B1)
@@ -720,15 +699,10 @@ impl MoveManager {
         use bitboard::*;
 
         // has king moved?
-        if self.history_contains_from_position(E8) {
-            dbg!("black king has moved");
-            return None;
-        }
-
         let mut moves = Vec::with_capacity(2);
 
         // check short castle
-        if !self.history_contains_from_position(H8)
+        if self.black_kingside_castle
             && !board.has_piece_at(F8)
             && !board.has_piece_at(G8)
             && !self.is_under_attack(board, F8, Color::White)
@@ -743,7 +717,7 @@ impl MoveManager {
         }
 
         // check long castle
-        if !self.history_contains_from_position(A8)
+        if self.black_queenside_castle
             && !board.has_piece_at(D8)
             && !board.has_piece_at(C8)
             && !board.has_piece_at(B8)

@@ -1,4 +1,6 @@
-use bitboard::Position;
+use std::collections::HashSet;
+
+use bitboard::{Position, Rank};
 
 use crate::{
     chess_board::ChessBoard,
@@ -89,6 +91,48 @@ impl Game {
     }
 
     pub fn from_fen(fen: &str) -> Result<Self, ()> {
+        // FEN: 8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50
+        let parts: Vec<_> = fen.split(' ').collect();
+
+        if parts.len() != 6 {
+            return Err(());
+        }
+
+        // first part is board setup
+        // TODO
+
+        // second part is current player
+        let current_player = match parts[1] {
+            "w" => Color::White,
+            "b" => Color::Black,
+            _ => return Err(()),
+        };
+
+        // the third part contains castling rights
+        let castling: HashSet<char> = parts[2].chars().collect();
+        let white_kingside = castling.contains(&'K');
+        let white_queenside = castling.contains(&'Q');
+        let black_kingside = castling.contains(&'k');
+        let black_queenside = castling.contains(&'q');
+
+        // the fourth part is en passant target square
+        let (black_en_passant, white_en_passant) = if parts[3] != "-" {
+            let position: Position = parts[3].parse().unwrap();
+            match position.rank() {
+                Rank::Three => ((Some(position), None)),
+                Rank::Six => (None, Some(position)),
+                _ => (None, None),
+            }
+        } else {
+            (None, None)
+        };
+
+        // the fifth part contains the number of halfmoves since the last capture or pawn advancement (for 50-move rule)
+        // TODO
+
+        // the sixth part contains the number of fullmoves, starting at 1
+        // TODO
+
         todo!()
     }
 }
