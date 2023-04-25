@@ -12,7 +12,7 @@ mod game;
 mod piece;
 pub mod prelude;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Color {
     Black,
     White,

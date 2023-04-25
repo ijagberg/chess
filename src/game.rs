@@ -56,9 +56,16 @@ impl Game {
         self.move_manager.get_legal_moves().is_empty()
     }
 
-    pub fn winner(&self) -> Option<Color> {
+    pub fn game_result(&self) -> Option<GameOver> {
         if self.is_over() {
-            Some(self.current_player.opponent())
+            if self
+                .move_manager
+                .is_in_check(&self.board, self.current_player())
+            {
+                Some(GameOver::Winner(self.current_player().opponent()))
+            } else {
+                Some(GameOver::Draw)
+            }
         } else {
             None
         }
@@ -76,6 +83,25 @@ impl Game {
             self.move_manager
                 .evaluate_legal_moves(&self.board, self.current_player);
             Ok(())
+        }
+    }
+
+    pub fn from_fen(fen: &str) -> Result<Self, ()> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameOver {
+    Winner(Color),
+    Draw,
+}
+
+impl GameOver {
+    pub fn unwrap_winner(self) -> Color {
+        match self {
+            GameOver::Winner(w) => w,
+            GameOver::Draw => panic!("called `GameOver::unwrap_winner()` on a `Draw` value"),
         }
     }
 }
@@ -218,7 +244,7 @@ mod tests {
         game.make_move(regular(F3, F6)).unwrap();
         game.make_move(regular(G8, F6)).unwrap();
         game.make_move(regular(D6, E7)).unwrap();
-        assert_eq!(game.winner(), Some(Color::White));
+        assert_eq!(game.game_result().unwrap().unwrap_winner(), Color::White);
     }
 
     #[test]
@@ -244,7 +270,7 @@ mod tests {
             piece: PromotionPiece::Knight,
         })
         .unwrap();
-        assert_eq!(game.winner(), Some(Color::Black));
+        assert_eq!(game.game_result().unwrap().unwrap_winner(), Color::Black);
     }
 
     #[test]
@@ -271,7 +297,7 @@ mod tests {
         game.make_move(regular(D8, E8)).unwrap();
         game.make_move(regular(E6, C7)).unwrap();
         game.make_move(regular(E7, B4)).unwrap();
-        assert_eq!(game.winner(), Some(Color::Black));
+        assert_eq!(game.game_result().unwrap().unwrap_winner(), Color::Black);
     }
 
     /// Set up a game where en passant is possible

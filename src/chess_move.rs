@@ -1,6 +1,5 @@
-use bitboard::{Bitboard, Position, Rank, INCREASING};
-
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
+use bitboard::{Bitboard, Position, Rank, INCREASING};
 use std::option::Option;
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
@@ -100,6 +99,38 @@ impl ChessMove {
             .map(|&piece| ChessMove::Promotion { from, to, piece })
             .collect()
     }
+
+    /// Returns `true` if the chess move is [`Regular`].
+    ///
+    /// [`Regular`]: ChessMove::Regular
+    #[must_use]
+    pub fn is_regular(&self) -> bool {
+        matches!(self, Self::Regular { .. })
+    }
+
+    /// Returns `true` if the chess move is [`EnPassant`].
+    ///
+    /// [`EnPassant`]: ChessMove::EnPassant
+    #[must_use]
+    pub fn is_en_passant(&self) -> bool {
+        matches!(self, Self::EnPassant { .. })
+    }
+
+    /// Returns `true` if the chess move is [`Promotion`].
+    ///
+    /// [`Promotion`]: ChessMove::Promotion
+    #[must_use]
+    pub fn is_promotion(&self) -> bool {
+        matches!(self, Self::Promotion { .. })
+    }
+
+    /// Returns `true` if the chess move is [`Castle`].
+    ///
+    /// [`Castle`]: ChessMove::Castle
+    #[must_use]
+    pub fn is_castle(&self) -> bool {
+        matches!(self, Self::Castle { .. })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -127,6 +158,8 @@ pub(crate) struct MoveManager {
     legal_moves: Vec<ChessMove>,
     black_king: Position,
     white_king: Position,
+    en_passant_possible_for_white: Option<Position>,
+    en_passant_possible_for_black: Option<Position>,
 }
 
 impl MoveManager {
@@ -154,6 +187,8 @@ impl MoveManager {
             legal_moves: vec![],
             black_king: black_king.expect("no black king on board"),
             white_king: white_king.expect("no white king on board"),
+            en_passant_possible_for_white: None,
+            en_passant_possible_for_black: None,
         };
 
         this
@@ -281,6 +316,19 @@ impl MoveManager {
                             }
                         }
                     }
+                    if moved_piece.kind() == PieceType::Pawn
+                        && chess_move.is_regular()
+                        && chess_move.from().manhattan_distance_to(chess_move.to()) == 2
+                    {
+                        match moved_piece.color() {
+                            Color::Black => {
+                                self.en_passant_possible_for_white = None;
+                            }
+                            Color::White => {
+                                self.en_passant_possible_for_black = None;
+                            }
+                        }
+                    }
                     set_option(board, to, taken_piece);
                 }
                 ChessMove::EnPassant {
@@ -326,7 +374,7 @@ impl MoveManager {
             .copied()
     }
 
-    fn is_in_check(&self, board: &ChessBoard, player: Color) -> bool {
+    pub fn is_in_check(&self, board: &ChessBoard, player: Color) -> bool {
         match player {
             Color::Black => {
                 let attackers = self.get_attackers(board, self.black_king, Color::White);
@@ -495,21 +543,13 @@ impl MoveManager {
 
             // en passant
             if from.rank() == Rank::Five {
-                if let Some(ChessMove::Regular { from: f, to: t }) = self.previous_move() {
-                    let left_file = from.file().left();
-                    let right_file = from.file().right();
-                    for file in [left_file, right_file].iter().filter_map(|&f| f) {
-                        if f == Position::new(file, Rank::Seven)
-                            && t == Position::new(file, Rank::Five)
-                        {
-                            legal_moves.push(ChessMove::EnPassant {
-                                from,
-                                to: Position::new(file, Rank::Six),
-                                taken_index: Position::new(file, Rank::Five),
-                                taken_original_index: Position::new(file, Rank::Seven),
-                            });
-                        }
-                    }
+                if let Some(en_passant_target) = self.en_passant_possible_for_white {
+                    legal_moves.push(ChessMove::EnPassant {
+                        from,
+                        to: en_passant_target,
+                        taken_original_index: Position::new(en_passant_target.file(), Rank::Seven),
+                        taken_index: Position::new(en_passant_target.file(), Rank::Five),
+                    })
                 }
             }
         }
@@ -705,30 +745,6 @@ impl MoveManager {
             legal_moves.push(ChessMove::Regular { from, to });
         }
         legal_moves
-
-        // let mut positions = Vec::new();
-        // for to in KNIGHT_OFFSETS
-        //     .iter()
-        //     .filter_map(|&(file_step, rank_step)| from.add_offset(file_step, rank_step))
-        // {
-        //     match board.get_piece(to) {
-        //         Some(piece) => {
-        //             if !piece.is_color(player) {
-        //                 positions.push(to);
-        //             }
-        //         }
-        //         None => {
-        //             positions.push(to);
-        //         }
-        //     }
-        // }
-
-        // let legal_moves = positions
-        //     .into_iter()
-        //     .map(|to| ChessMove::Regular { from, to })
-        //     .collect();
-
-        // legal_moves
     }
 
     fn evaluate_legal_bishop_moves_from(
@@ -760,26 +776,6 @@ impl MoveManager {
             legal_moves.push(ChessMove::Regular { from, to })
         }
         legal_moves
-        // let mut positions = Vec::new();
-
-        // let mut up_file = self.step_until_collision(from, 1, 0, board, player);
-        // positions.append(&mut up_file);
-
-        // let mut down_file = self.step_until_collision(from, -1, 0, board, player);
-        // positions.append(&mut down_file);
-
-        // let mut up_rank = self.step_until_collision(from, 0, 1, board, player);
-        // positions.append(&mut up_rank);
-
-        // let mut down_rank = self.step_until_collision(from, 0, -1, board, player);
-        // positions.append(&mut down_rank);
-
-        // let legal_moves = positions
-        //     .into_iter()
-        //     .map(|to| ChessMove::Regular { from, to })
-        //     .collect();
-
-        // legal_moves
     }
 
     fn evaluate_legal_queen_moves_from(
