@@ -24,7 +24,7 @@ pub const KING_OFFSETS: [(i32, i32); 8] = [
     (-1, 1),
 ];
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum ChessMove {
     Regular {
         from: Position,
@@ -133,7 +133,7 @@ impl ChessMove {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromotionPiece {
     Knight,
     Bishop,
@@ -154,7 +154,7 @@ impl PromotionPiece {
 
 #[derive(Debug)]
 pub(crate) struct MoveManager {
-    history: Vec<(Color, ChessMove, Option<Piece>)>,
+    history: Vec<ChessBoard>,
     pub(crate) legal_moves: Vec<ChessMove>,
     en_passant_possible_for_white: Option<Position>,
     en_passant_possible_for_black: Option<Position>,
@@ -165,7 +165,7 @@ pub(crate) struct MoveManager {
 }
 
 impl MoveManager {
-    pub(crate) fn new(board: &ChessBoard) -> Self {
+    pub(crate) fn new() -> Self {
         let mut this = Self {
             history: vec![],
             legal_moves: vec![],
@@ -282,7 +282,7 @@ impl MoveManager {
 
         let taken_piece = self.dry_run_move(board, player, chess_move);
 
-        self.history.push((player, chess_move, taken_piece));
+        self.history.push(*board);
 
         taken_piece
     }
@@ -298,7 +298,7 @@ impl MoveManager {
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
-        let mut actual_legal_moves = Vec::new();
+        let mut actual_legal_moves = Vec::with_capacity(60);
         for &legal_move in &legal_moves {
             let mut board_clone = board.clone();
             print!("testing move: {}, {:?}", player, legal_move);
@@ -312,78 +312,6 @@ impl MoveManager {
         }
 
         self.legal_moves = actual_legal_moves;
-    }
-
-    fn undo_last_move(&mut self, board: &mut ChessBoard) {
-        fn set_option(board: &mut ChessBoard, pos: Position, piece: Option<Piece>) {
-            if let Some(piece) = piece {
-                board.set_piece(pos, piece);
-            }
-        }
-
-        if let Some((player, chess_move, taken_piece)) = self.history.pop() {
-            println!("undoing move {:?} for player {}", chess_move, player);
-            match chess_move {
-                ChessMove::Regular { from, to } => {
-                    let moved_piece = board.take_piece(to).unwrap();
-                    board.set_piece(from, moved_piece);
-
-                    if moved_piece.kind() == PieceType::Pawn
-                        && chess_move.is_regular()
-                        && chess_move.from().manhattan_distance_to(chess_move.to()) == 2
-                    {
-                        match moved_piece.color() {
-                            Color::Black => {
-                                self.en_passant_possible_for_white = None;
-                            }
-                            Color::White => {
-                                self.en_passant_possible_for_black = None;
-                            }
-                        }
-                    }
-                    set_option(board, to, taken_piece);
-                }
-                ChessMove::EnPassant {
-                    from,
-                    to,
-                    taken_index,
-                    taken_original_index,
-                } => {
-                    let moved_pawn = board.take_piece(to).unwrap();
-                    board.set_piece(from, moved_pawn);
-                    let taken_pawn = taken_piece.unwrap();
-                    board.set_piece(taken_original_index, taken_pawn);
-                }
-                ChessMove::Promotion { from, to, piece } => {
-                    let color = match from.rank() {
-                        Rank::Two => Color::Black,
-                        Rank::Seven => Color::White,
-                        _ => panic!(),
-                    };
-                    board.set_piece(from, Piece::pawn(color));
-                    board.take_piece(to);
-                    set_option(board, to, taken_piece);
-                }
-                ChessMove::Castle {
-                    rook_from,
-                    rook_to,
-                    king_from,
-                    king_to,
-                } => {
-                    let king = board.take_piece(king_to).unwrap();
-                    let rook = board.take_piece(rook_to).unwrap();
-                    board.set_piece(king_from, king);
-                    board.set_piece(rook_from, rook);
-                }
-            }
-        }
-    }
-
-    fn previous_move(&self) -> Option<ChessMove> {
-        self.history
-            .last()
-            .map(|(_player, chess_move, _taken_piece)| chess_move)
-            .copied()
     }
 
     pub fn is_in_check(&self, board: &ChessBoard, player: Color) -> bool {
@@ -556,9 +484,11 @@ impl MoveManager {
                 }
             }
         } else {
-            let targets =
-                Bitboard::white_pawn_targets(from, board.get_occupancy_for_color(Color::Black))
-                    & !board.get_occupancy_for_color(Color::White);
+            let targets = Bitboard::white_pawn_targets(
+                from,
+                board.get_occupancy_for_color(Color::Black),
+                board.get_occupancy_for_color(Color::White),
+            ) & !board.get_occupancy_for_color(Color::White);
             for to in targets.positions() {
                 legal_moves.push(ChessMove::Regular { from, to });
             }
@@ -603,9 +533,11 @@ impl MoveManager {
                 }
             }
         } else {
-            let targets =
-                Bitboard::black_pawn_targets(from, board.get_occupancy_for_color(Color::White))
-                    & !board.get_occupancy_for_color(Color::Black);
+            let targets = Bitboard::black_pawn_targets(
+                from,
+                board.get_occupancy_for_color(Color::White),
+                board.get_occupancy_for_color(Color::Black),
+            ) & !board.get_occupancy_for_color(Color::Black);
             for to in targets.positions() {
                 legal_moves.push(ChessMove::Regular { from, to });
             }
@@ -796,13 +728,6 @@ impl MoveManager {
         }
         legal_moves
     }
-
-    /// Check if the move history contains any move that was made *from* the given index.
-    fn history_contains_from_position(&self, from: Position) -> bool {
-        self.history
-            .iter()
-            .any(|(_player, chess_move, _taken_piece)| chess_move.from() == from)
-    }
 }
 
 #[cfg(test)]
@@ -814,7 +739,7 @@ mod tests {
     #[test]
     fn legal_moves() {
         let board = ChessBoard::new();
-        let mut manager = MoveManager::new(&board);
+        let mut manager = MoveManager::new();
         manager.evaluate_legal_moves(&board, White);
 
         dbg!(&manager);
@@ -857,7 +782,7 @@ mod tests {
     #[test]
     fn bishop_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new(&board);
+        let manager = MoveManager::new();
 
         let bishop_moves_from_f4: Vec<Position> = manager
             .evaluate_legal_bishop_moves_from(&board, F4, White)
@@ -877,7 +802,7 @@ mod tests {
     #[test]
     fn rook_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new(&board);
+        let manager = MoveManager::new();
 
         let rook_moves_from_c5: Vec<Position> = manager
             .evaluate_legal_rook_moves_from(&board, C5, Black)
@@ -893,7 +818,7 @@ mod tests {
     #[test]
     fn knight_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new(&board);
+        let manager = MoveManager::new();
 
         let knight_moves_from_g4: Vec<Position> = manager
             .evaluate_legal_knight_moves_from(&board, G4, White)
@@ -913,7 +838,7 @@ mod tests {
     #[test]
     fn queen_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new(&board);
+        let manager = MoveManager::new();
 
         let queen_moves_from_a4: Vec<Position> = manager
             .evaluate_legal_queen_moves_from(&board, A4, White)
@@ -924,5 +849,89 @@ mod tests {
             queen_moves_from_a4,
             vec![A3, B3, B4, C4, D4, E4, F4, G4, H4, A5, B5, A6, C6, A7, D7]
         );
+    }
+
+    #[test]
+    /// Remove all pawns from a chessboard and check legal moves for white
+    fn moves_test_1() {
+        use ChessMove::*;
+        let mut board = ChessBoard::new();
+        for pos in [
+            A2, B2, C2, D2, E2, F2, G2, H2, A7, B7, C7, D7, E7, F7, G7, H7,
+        ] {
+            board.take_piece(pos).unwrap();
+        }
+
+        dbg!(board);
+
+        let mut move_manager = MoveManager::new();
+        move_manager.evaluate_legal_moves(&board, White);
+        let moves = move_manager.get_legal_moves();
+        let expected = [
+            // queenside rook can move up to and including A8 (which would take blacks queenside rook)
+            Regular { from: A1, to: A2 },
+            Regular { from: A1, to: A3 },
+            Regular { from: A1, to: A4 },
+            Regular { from: A1, to: A5 },
+            Regular { from: A1, to: A6 },
+            Regular { from: A1, to: A7 },
+            Regular { from: A1, to: A8 },
+            // queenside knight
+            Regular { from: B1, to: D2 },
+            Regular { from: B1, to: A3 },
+            Regular { from: B1, to: C3 },
+            // queenside (black square) bishop
+            Regular { from: C1, to: B2 },
+            Regular { from: C1, to: D2 },
+            Regular { from: C1, to: A3 },
+            Regular { from: C1, to: E3 },
+            Regular { from: C1, to: F4 },
+            Regular { from: C1, to: G5 },
+            Regular { from: C1, to: H6 },
+            // queen
+            Regular { from: D1, to: C2 },
+            Regular { from: D1, to: D2 },
+            Regular { from: D1, to: E2 },
+            Regular { from: D1, to: B3 },
+            Regular { from: D1, to: D3 },
+            Regular { from: D1, to: F3 },
+            Regular { from: D1, to: A4 },
+            Regular { from: D1, to: D4 },
+            Regular { from: D1, to: G4 },
+            Regular { from: D1, to: D5 },
+            Regular { from: D1, to: H5 },
+            Regular { from: D1, to: D6 },
+            Regular { from: D1, to: D7 },
+            Regular { from: D1, to: D8 },
+            // king
+            // Regular { from: E1, to: D2 }, // cant go to D2 because black queen is checking it
+            Regular { from: E1, to: E2 },
+            Regular { from: E1, to: F2 },
+            // white square bishop
+            Regular { from: F1, to: E2 },
+            Regular { from: F1, to: G2 },
+            Regular { from: F1, to: D3 },
+            Regular { from: F1, to: H3 },
+            Regular { from: F1, to: C4 },
+            Regular { from: F1, to: B5 },
+            Regular { from: F1, to: A6 },
+            // kingside knight
+            Regular { from: G1, to: E2 },
+            Regular { from: G1, to: F3 },
+            Regular { from: G1, to: H3 },
+            // kingside rook
+            Regular { from: H1, to: H2 },
+            Regular { from: H1, to: H3 },
+            Regular { from: H1, to: H4 },
+            Regular { from: H1, to: H5 },
+            Regular { from: H1, to: H6 },
+            Regular { from: H1, to: H7 },
+            Regular { from: H1, to: H8 },
+        ];
+
+        assert_eq!(moves.len(), expected.len());
+        for (actual, expected) in moves.iter().zip(expected.iter()) {
+            assert_eq!(actual, expected);
+        }
     }
 }

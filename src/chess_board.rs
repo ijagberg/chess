@@ -12,7 +12,7 @@ use std::ops::Shl;
 use std::ops::Shr;
 use std::{fmt::Debug, ops::BitOr};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChessBoard {
     white_kings: Bitboard,
     black_kings: Bitboard,
@@ -86,6 +86,38 @@ impl ChessBoard {
             black_pieces,
             all_pieces,
         }
+    }
+
+    pub fn clear(&mut self) {
+        let empty = Bitboard::empty();
+
+        self.all_pieces = empty;
+        self.white_pieces = empty;
+        self.black_pieces = empty;
+
+        self.all_kings = empty;
+        self.white_kings = empty;
+        self.black_kings = empty;
+
+        self.all_queens = empty;
+        self.white_queens = empty;
+        self.black_queens = empty;
+
+        self.all_rooks = empty;
+        self.white_rooks = empty;
+        self.black_rooks = empty;
+
+        self.all_bishops = empty;
+        self.white_bishops = empty;
+        self.black_bishops = empty;
+
+        self.all_knights = empty;
+        self.white_knights = empty;
+        self.black_knights = empty;
+
+        self.all_pawns = empty;
+        self.white_pawns = empty;
+        self.black_pawns = empty;
     }
 
     pub fn full_occupancy(&self) -> Bitboard {
@@ -332,6 +364,106 @@ impl ChessBoard {
                 Color::White => !self.white_pieces,
             }
     }
+
+    pub fn from_fen(fen: &str) -> Result<Self, ()> {
+        use Color::*;
+        use PieceType::*;
+        let mut board = ChessBoard::new();
+        board.clear();
+
+        let rows: Vec<_> = fen.split('/').collect();
+        for (row, rank) in rows.iter().zip(Rank::Eight.down_all()) {
+            let mut current_file = File::A;
+            for c in row.chars() {
+                let pos = Position::new(current_file, rank);
+                let bb = Bitboard::with_one(pos);
+                if let Some(digit) = c.to_digit(10) {
+                    // c empty squares starting at `current_file`
+                    current_file = current_file.add_offset(digit as i32 - 1).ok_or(())?;
+                } else {
+                    if current_file != File::H {
+                        current_file = current_file.right().unwrap();
+                    }
+                    match c {
+                        'p' => {
+                            board.black_pawns |= bb;
+                            board.all_pawns |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'n' => {
+                            board.black_knights |= bb;
+                            board.all_knights |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'b' => {
+                            board.black_bishops |= bb;
+                            board.all_bishops |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'r' => {
+                            board.black_rooks |= bb;
+                            board.all_rooks |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'q' => {
+                            board.black_queens |= bb;
+                            board.all_queens |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'k' => {
+                            board.black_kings |= bb;
+                            board.all_kings |= bb;
+                            board.black_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'P' => {
+                            board.white_pawns |= bb;
+                            board.all_pawns |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'N' => {
+                            board.white_knights |= bb;
+                            board.all_knights |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'B' => {
+                            board.white_bishops |= bb;
+                            board.all_bishops |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'R' => {
+                            board.white_rooks |= bb;
+                            board.all_rooks |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'Q' => {
+                            board.white_queens |= bb;
+                            board.all_queens |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        'K' => {
+                            board.white_kings |= bb;
+                            board.all_kings |= bb;
+                            board.white_pieces |= bb;
+                            board.all_pieces |= bb;
+                        }
+                        _ => return Err(()),
+                    }
+                }
+            }
+        }
+        Ok(board)
+    }
 }
 
 #[cfg(test)]
@@ -404,5 +536,11 @@ mod tests {
         assert_eq!(b.take_piece(A1).unwrap(), Piece::rook(Color::White));
         assert_eq!(b.white_rooks, Bitboard::with_ones([H1]));
         assert_eq!(b.all_rooks, Bitboard::with_ones([H1, A8, H8]));
+    }
+
+    #[test]
+    fn from_fen_test() {
+        let board = ChessBoard::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
+        assert_eq!(board, ChessBoard::new());
     }
 }

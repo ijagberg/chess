@@ -1,32 +1,28 @@
-use std::collections::HashSet;
-
-use bitboard::{Position, Rank};
-
 use crate::{
     chess_board::ChessBoard,
     chess_move::{ChessMove, MoveManager},
     Color,
 };
+use bitboard::{File, Position, Rank};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Game {
     current_player: Color,
     move_manager: MoveManager,
     board: ChessBoard,
-    bitboard: ChessBoard,
 }
 
 impl Game {
     pub fn new() -> Self {
         let board = ChessBoard::new();
         let current_player = Color::White;
-        let mut move_manager = MoveManager::new(&board);
+        let mut move_manager = MoveManager::new();
         move_manager.evaluate_legal_moves(&board, current_player);
         Self {
             current_player,
             move_manager,
             board,
-            bitboard: ChessBoard::new(),
         }
     }
 
@@ -347,6 +343,38 @@ mod tests {
         game.make_move(regular(E6, C7)).unwrap();
         game.make_move(regular(E7, B4)).unwrap();
         assert_eq!(game.game_result().unwrap().unwrap_winner(), Color::Black);
+    }
+
+    #[test]
+    fn stalemate_test() {
+        let mut game = Game::new();
+        // this is the fastest known stalemate
+        // https://www.chess.com/forum/view/game-showcase/fastest-stalemate-known-in-chess
+        for (from, to) in [
+            (E2, E3),
+            (A7, A5),
+            (D1, H5),
+            (A8, A6),
+            (H5, A5),
+            (H7, H5),
+            (H2, H4),
+            (A6, H6),
+            (A5, C7),
+            (F7, F6),
+            (C7, D7),
+            (E8, F7),
+            (D7, B7),
+            (D8, D3),
+            (B7, B8),
+            (D3, H7),
+            (B8, C8),
+            (F7, G6),
+            (C8, E6),
+        ] {
+            game.make_move(regular(from, to)).unwrap();
+        }
+        assert!(game.is_over());
+        assert_eq!(game.game_result().unwrap(), GameOver::Draw);
     }
 
     /// Set up a game where en passant is possible
