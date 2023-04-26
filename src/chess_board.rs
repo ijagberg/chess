@@ -1,16 +1,9 @@
-use crate::piece::PieceType;
-use crate::Color;
-use crate::Piece;
+use crate::{piece::PieceType, Color, Piece};
 use bitboard::*;
-use std::ops::BitAnd;
-use std::ops::BitAndAssign;
-use std::ops::BitOrAssign;
-use std::ops::Deref;
-use std::ops::Neg;
-use std::ops::Not;
-use std::ops::Shl;
-use std::ops::Shr;
-use std::{fmt::Debug, ops::BitOr};
+use std::{
+    fmt::Debug,
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Deref, Neg, Not, Shl, Shr},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChessBoard {
