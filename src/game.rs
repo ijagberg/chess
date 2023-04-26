@@ -1,10 +1,11 @@
 use crate::{
     chess_board::ChessBoard,
     chess_move::{ChessMove, MoveManager},
+    fen::Fen,
     Color,
 };
 use bitboard::{File, Position, Rank};
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 /// A game of chess.
 #[derive(Debug)]
@@ -15,16 +16,7 @@ pub struct Game {
 }
 
 impl Game {
-    /// Create a new chess game, with pieces on their standard starting positions.
-    pub fn new() -> Self {
-        let board = ChessBoard::new();
-        let current_player = Color::White;
-        let mut move_manager = MoveManager::default();
-        move_manager.evaluate_legal_moves(&board, current_player);
-        Self::construct(current_player, move_manager, board)
-    }
-
-    fn construct(current_player: Color, move_manager: MoveManager, board: ChessBoard) -> Self {
+    fn new(current_player: Color, move_manager: MoveManager, board: ChessBoard) -> Self {
         Self {
             current_player,
             move_manager,
@@ -95,7 +87,6 @@ impl Game {
         } else {
             self.move_manager
                 .make_move(&mut self.board, self.current_player, chess_move);
-            dbg!("move was made", chess_move);
             self.current_player = self.current_player.opponent();
             self.move_manager
                 .evaluate_legal_moves(&self.board, self.current_player);
@@ -104,65 +95,38 @@ impl Game {
         }
     }
 
-    pub fn from_fen(fen: &str) -> Result<Self, ()> {
-        // FEN: 8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50
-        let parts: Vec<_> = fen.split(' ').collect();
-
-        if parts.len() != 6 {
-            return Err(());
-        }
-
-        // first part is board setup
-        let board = ChessBoard::from_fen(parts[0])?;
-
-        // second part is current player
-        let current_player = match parts[1] {
-            "w" => Color::White,
-            "b" => Color::Black,
-            _ => return Err(()),
-        };
-
-        // the third part contains castling rights
-        let castling: HashSet<char> = parts[2].chars().collect();
-        let white_kingside_castle = castling.contains(&'K');
-        let white_queenside_castle = castling.contains(&'Q');
-        let black_kingside_castle = castling.contains(&'k');
-        let black_queenside_castle = castling.contains(&'q');
-
-        // the fourth part is en passant target square
-        let (en_passant_possible_for_black, en_passant_possible_for_white) = if parts[3] != "-" {
-            let position: Position = parts[3].parse().map_err(|_| ())?;
-            match position.rank() {
-                Rank::Three => ((Some(position), None)),
-                Rank::Six => (None, Some(position)),
-                _ => (None, None),
-            }
-        } else {
-            (None, None)
-        };
-
-        // the fifth part contains the number of halfmoves since the last capture or pawn advancement (for 50-move rule)
-        let half_moves = parts[4].parse().map_err(|_| ())?;
-
-        // the sixth part contains the number of fullmoves, starting at 1
-        let full_moves = parts[5].parse().map_err(|_| ())?;
-
-        let mut move_manager = MoveManager::new(
+    pub fn from_fen_string(fen: &str) -> Result<Self, String> {
+        let fen = Fen::from_str(fen)?;
+        let board = fen.board();
+        let mut mm = MoveManager::new(
             vec![],
             vec![],
-            en_passant_possible_for_white,
-            en_passant_possible_for_black,
-            white_kingside_castle,
-            white_queenside_castle,
-            black_kingside_castle,
-            black_queenside_castle,
-            half_moves,
-            full_moves,
+            fen.white_en_passant_target(),
+            fen.black_en_passant_target(),
+            fen.castling_rights(),
+            fen.halfmoves(),
+            fen.fullmoves(),
         );
+        mm.evaluate_legal_moves(&board, fen.current_player());
+        Ok(Self::new(fen.current_player(), mm, board))
+    }
 
+    pub fn to_fen_string(&self) -> String {
+        todo!()
+    }
+
+    pub fn to_pretty_string(&self) -> String {
+        self.board().to_pretty_string()
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        let board = ChessBoard::default();
+        let current_player = Color::White;
+        let mut move_manager = MoveManager::default();
         move_manager.evaluate_legal_moves(&board, current_player);
-
-        Ok(Self::construct(current_player, move_manager, board))
+        Self::new(current_player, move_manager, board)
     }
 }
 
@@ -184,6 +148,7 @@ impl GameOver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chess_move::CastlingRights;
     use crate::prelude::*;
     use crate::{chess_move::PromotionPiece, Color::*};
     use bitboard::*;
@@ -191,7 +156,7 @@ mod tests {
 
     #[test]
     fn make_move() {
-        let mut game = Game::new();
+        let mut game = Game::default();
         let e2_e4 = ChessMove::Regular { from: E2, to: E4 };
 
         game.make_move(e2_e4).unwrap();
@@ -275,7 +240,7 @@ mod tests {
 
     #[test]
     fn immortal_game() {
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(E7, E5)).unwrap();
         game.make_move(regular(F2, F4)).unwrap();
@@ -327,7 +292,7 @@ mod tests {
     #[test]
     fn wiede_vs_alphonse_goetz() {
         // https://www.chessgames.com/perl/chessgame?gid=1075778
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(E7, E5)).unwrap();
         game.make_move(regular(F2, F4)).unwrap();
@@ -353,7 +318,7 @@ mod tests {
     #[test]
     fn heinrich_lohmann_vs_rudolf_teschner() {
         // https://www.chessgames.com/perl/chessgame?gid=1250788
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(E7, E6)).unwrap();
         game.make_move(regular(D2, D4)).unwrap();
@@ -380,7 +345,7 @@ mod tests {
 
     #[test]
     fn stalemate_test() {
-        let mut game = Game::new();
+        let mut game = Game::default();
         // this is the fastest known stalemate
         // https://www.chess.com/forum/view/game-showcase/fastest-stalemate-known-in-chess
         for (from, to) in [
@@ -413,10 +378,9 @@ mod tests {
     #[test]
     fn from_fen_test() {
         use ChessMove::*;
-        let fen = "8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50";
-        let game = Game::from_fen(fen).unwrap();
+        let game =
+            Game::from_fen_string("8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50").unwrap();
         assert!(game.current_player().is_black());
-        dbg!(game.board());
         assert_eq!(
             game.move_manager,
             MoveManager::new(
@@ -432,19 +396,113 @@ mod tests {
                 ],
                 None,
                 None,
-                false,
-                false,
-                false,
-                false,
+                CastlingRights::default(),
                 99,
                 50
             )
         );
     }
 
+    #[test]
+    fn to_pretty_string_test() {
+        let mut game = Game::default();
+        game.make_move(regular(E2, E4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(E7, E5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F2, F4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(E5, F4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F1, C4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(D8, H4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(E1, F1)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(B7, B5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C4, B5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G8, F6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G1, F3)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H4, H6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(D2, D3)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F6, H5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F3, H4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H6, G5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H4, F5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C7, C6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G2, G4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H5, F6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H1, G1)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C6, B5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H2, H4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G5, G6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(H4, H5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G6, G5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(D1, F3)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F6, G8)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C1, F4)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G5, F6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(B1, C3)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F8, C5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C3, D5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F6, B2)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F4, D6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(C5, G1)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(E4, E5)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(B2, A1)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F1, E2)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(B8, A6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F5, G7)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(E8, D8)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(F3, F6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(G8, F6)).unwrap();
+        println!("{}", game.to_pretty_string());
+        game.make_move(regular(D6, E7)).unwrap();
+        println!("{}", game.to_pretty_string());
+
+        // assert!(false);
+    }
+
     /// Set up a game where en passant is possible
     fn setup_game_1() -> Game {
-        let mut game = Game::new();
+        let mut game = Game::default();
         dbg!(&game);
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(H7, H6)).unwrap();
@@ -455,7 +513,7 @@ mod tests {
 
     /// Set up a game where the white king is in check
     fn setup_game_2() -> Game {
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(E2, E4)).unwrap();
         game.make_move(regular(E7, E5)).unwrap();
         game.make_move(regular(D2, D4)).unwrap();
@@ -465,7 +523,7 @@ mod tests {
 
     /// Set up a game where white can promote a pawn
     fn setup_promotion_game() -> Game {
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(B2, B4)).unwrap();
         game.make_move(regular(A7, A5)).unwrap();
         game.make_move(regular(B4, A5)).unwrap();
@@ -479,7 +537,7 @@ mod tests {
 
     /// Set up a game where white can castle
     fn setup_castle_game() -> Game {
-        let mut game = Game::new();
+        let mut game = Game::default();
         game.make_move(regular(E2, E3)).unwrap();
         game.make_move(regular(E7, E5)).unwrap();
         game.make_move(regular(F1, E2)).unwrap();

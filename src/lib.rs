@@ -10,6 +10,7 @@ mod chess_board;
 mod chess_move;
 mod game;
 mod piece;
+mod fen;
 pub mod prelude;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +41,13 @@ impl Color {
     #[must_use]
     pub fn is_white(&self) -> bool {
         matches!(self, Self::White)
+    }
+
+    pub fn fen_char(&self) -> char {
+        match self {
+            Color::Black => 'b',
+            Color::White => 'w',
+        }
     }
 }
 

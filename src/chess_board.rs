@@ -1,6 +1,7 @@
-use crate::{piece::PieceType, Color, Piece};
+use crate::{fen::Fen, piece::PieceType, Color, Piece};
 use bitboard::*;
 use std::{
+    convert::TryFrom,
     fmt::Debug,
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Deref, Neg, Not, Shl, Shr},
 };
@@ -31,57 +32,7 @@ pub struct ChessBoard {
 }
 
 impl ChessBoard {
-    pub fn new() -> Self {
-        let white_kings = Bitboard::with_one(E1);
-        let black_kings = Bitboard::with_one(E8);
-        let all_kings = white_kings | black_kings;
-        let white_queens = Bitboard::with_one(D1);
-        let black_queens = Bitboard::with_one(D8);
-        let all_queens = white_queens | black_queens;
-        let white_rooks = Bitboard::with_ones([A1, H1]);
-        let black_rooks = Bitboard::with_ones([A8, H8]);
-        let all_rooks = white_rooks | black_rooks;
-        let white_knights = Bitboard::with_ones([B1, G1]);
-        let black_knights = Bitboard::with_ones([B8, G8]);
-        let all_knights = white_knights | black_knights;
-        let white_bishops = Bitboard::with_ones([C1, F1]);
-        let black_bishops = Bitboard::with_ones([C8, F8]);
-        let all_bishops = white_bishops | black_bishops;
-        let white_pawns = Bitboard::with_ones(RANK_TWO);
-        let black_pawns = Bitboard::with_ones(RANK_SEVEN);
-        let all_pawns = white_pawns | black_pawns;
-        let white_pieces =
-            white_kings | white_queens | white_rooks | white_knights | white_bishops | white_pawns;
-        let black_pieces =
-            black_kings | black_queens | black_rooks | black_knights | black_bishops | black_pawns;
-        let all_pieces = white_pieces | black_pieces;
-
-        Self::construct(
-            white_kings,
-            black_kings,
-            all_kings,
-            white_queens,
-            black_queens,
-            all_queens,
-            white_rooks,
-            black_rooks,
-            all_rooks,
-            white_knights,
-            black_knights,
-            all_knights,
-            white_bishops,
-            black_bishops,
-            all_bishops,
-            white_pawns,
-            black_pawns,
-            all_pawns,
-            white_pieces,
-            black_pieces,
-            all_pieces,
-        )
-    }
-
-    fn construct(
+    pub fn new(
         white_kings: Bitboard,
         black_kings: Bitboard,
         all_kings: Bitboard,
@@ -406,121 +357,91 @@ impl ChessBoard {
             }
     }
 
-    pub fn from_fen(fen: &str) -> Result<Self, ()> {
+    pub fn to_pretty_string(&self) -> String {
         use Color::*;
         use PieceType::*;
-        let mut board = ChessBoard::new();
-        board.clear();
 
-        let rows: Vec<_> = fen.split('/').collect();
-        for (row, rank) in rows.iter().zip(Rank::Eight.down_all()) {
-            let mut current_file = File::A;
-            for c in row.chars() {
-                let pos = Position::new(current_file, rank);
-                let bb = Bitboard::with_one(pos);
-                if let Some(digit) = c.to_digit(10) {
-                    // c empty squares starting at `current_file`
-                    let digit = digit as i32;
-                    if digit > 8 {
-                        return Err(());
-                    } else if digit + i32::from(u8::from(current_file)) == 8 {
-                        continue;
-                    } else {
-                        current_file = current_file.add_offset(digit as i32).ok_or(())?;
-                    }
-                } else {
-                    if current_file != File::H {
-                        current_file = current_file.right().unwrap();
-                    }
-                    match c {
-                        'p' => {
-                            board.black_pawns |= bb;
-                            board.all_pawns |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'n' => {
-                            board.black_knights |= bb;
-                            board.all_knights |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'b' => {
-                            board.black_bishops |= bb;
-                            board.all_bishops |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'r' => {
-                            board.black_rooks |= bb;
-                            board.all_rooks |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'q' => {
-                            board.black_queens |= bb;
-                            board.all_queens |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'k' => {
-                            board.black_kings |= bb;
-                            board.all_kings |= bb;
-                            board.black_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'P' => {
-                            board.white_pawns |= bb;
-                            board.all_pawns |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'N' => {
-                            board.white_knights |= bb;
-                            board.all_knights |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'B' => {
-                            board.white_bishops |= bb;
-                            board.all_bishops |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'R' => {
-                            board.white_rooks |= bb;
-                            board.all_rooks |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'Q' => {
-                            board.white_queens |= bb;
-                            board.all_queens |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        'K' => {
-                            board.white_kings |= bb;
-                            board.all_kings |= bb;
-                            board.white_pieces |= bb;
-                            board.all_pieces |= bb;
-                        }
-                        _ => return Err(()),
-                    }
-                }
+        let mut buf = String::from("┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
+        for rank in Rank::Eight.down_all() {
+            buf.push_str("│");
+            for file in File::A.right_all() {
+                let pos = Position::new(file, rank);
+                let s = match self.get_piece(pos) {
+                    Some(piece) => piece.to_string(),
+                    None => " ".to_string(),
+                };
+                buf.push_str(&format!(" {} │", s));
+            }
+            if rank != Rank::One {
+                buf.push_str("\n├───┼───┼───┼───┼───┼───┼───┼───┤\n");
             }
         }
-        Ok(board)
+        buf.push_str("\n└───┴───┴───┴───┴───┴───┴───┴───┘");
+        return buf;
+    }
+}
+
+impl Default for ChessBoard {
+    fn default() -> Self {
+        let white_kings = Bitboard::with_one(E1);
+        let black_kings = Bitboard::with_one(E8);
+        let all_kings = white_kings | black_kings;
+        let white_queens = Bitboard::with_one(D1);
+        let black_queens = Bitboard::with_one(D8);
+        let all_queens = white_queens | black_queens;
+        let white_rooks = Bitboard::with_ones([A1, H1]);
+        let black_rooks = Bitboard::with_ones([A8, H8]);
+        let all_rooks = white_rooks | black_rooks;
+        let white_knights = Bitboard::with_ones([B1, G1]);
+        let black_knights = Bitboard::with_ones([B8, G8]);
+        let all_knights = white_knights | black_knights;
+        let white_bishops = Bitboard::with_ones([C1, F1]);
+        let black_bishops = Bitboard::with_ones([C8, F8]);
+        let all_bishops = white_bishops | black_bishops;
+        let white_pawns = Bitboard::with_ones(RANK_TWO);
+        let black_pawns = Bitboard::with_ones(RANK_SEVEN);
+        let all_pawns = white_pawns | black_pawns;
+        let white_pieces =
+            white_kings | white_queens | white_rooks | white_knights | white_bishops | white_pawns;
+        let black_pieces =
+            black_kings | black_queens | black_rooks | black_knights | black_bishops | black_pawns;
+        let all_pieces = white_pieces | black_pieces;
+
+        Self::new(
+            white_kings,
+            black_kings,
+            all_kings,
+            white_queens,
+            black_queens,
+            all_queens,
+            white_rooks,
+            black_rooks,
+            all_rooks,
+            white_knights,
+            black_knights,
+            all_knights,
+            white_bishops,
+            black_bishops,
+            all_bishops,
+            white_pawns,
+            black_pawns,
+            all_pawns,
+            white_pieces,
+            black_pieces,
+            all_pieces,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
     fn get_color_of_pos_test() {
-        let b = ChessBoard::new();
+        let b = ChessBoard::default();
         assert_eq!(b.get_color_of_pos(E1), Some(Color::White));
         assert_eq!(b.get_color_of_pos(A7), Some(Color::Black));
         assert_eq!(b.get_color_of_pos(A6), None);
@@ -528,7 +449,7 @@ mod tests {
 
     #[test]
     fn get_kind_of_pos_test() {
-        let b = ChessBoard::new();
+        let b = ChessBoard::default();
         assert_eq!(b.get_kind_of_pos(E1), Some(PieceType::King));
         assert_eq!(b.get_kind_of_pos(A7), Some(PieceType::Pawn));
         assert_eq!(b.get_kind_of_pos(A6), None);
@@ -536,7 +457,7 @@ mod tests {
 
     #[test]
     fn get_piece_test() {
-        let b = ChessBoard::new();
+        let b = ChessBoard::default();
         assert_eq!(
             b.get_piece(E1),
             Some(Piece::new(Color::White, PieceType::King))
@@ -550,7 +471,7 @@ mod tests {
 
     #[test]
     fn knight_moves_test() {
-        let b = ChessBoard::new();
+        let b = ChessBoard::default();
         assert_eq!(b.knight_moves(Color::White, A1), Bitboard::with_one(B3));
 
         assert_eq!(
@@ -561,7 +482,7 @@ mod tests {
 
     #[test]
     fn king_moves_test() {
-        let b = ChessBoard::new();
+        let b = ChessBoard::default();
         assert_eq!(b.king_moves(Color::White, E1), Bitboard::empty());
         assert_eq!(
             b.king_moves(Color::White, E3),
@@ -571,7 +492,7 @@ mod tests {
 
     #[test]
     fn take_piece_test() {
-        let mut b = ChessBoard::new();
+        let mut b = ChessBoard::default();
         assert_eq!(b.take_piece(E2).unwrap(), Piece::pawn(Color::White));
         assert_eq!(
             b.white_pawns,
@@ -587,51 +508,10 @@ mod tests {
     }
 
     #[test]
-    fn from_fen_test() {
-        use PieceType::*;
-
-        let board = ChessBoard::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
-        assert_eq!(board, ChessBoard::new());
-
-        let board = ChessBoard::from_fen("8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8").unwrap();
-        for pos in INCREASING_A1_B1 {
-            let piece = board.get_piece(pos);
-            if [A4, B5, D6, E5, F4, H5].contains(&pos) {
-                assert_eq!(
-                    piece.unwrap(),
-                    Piece::black(Pawn),
-                    "pos: {}, piece: {:?}",
-                    pos,
-                    piece
-                );
-            } else if [A3, B4, D5, E4, F3, H4].contains(&pos) {
-                assert_eq!(
-                    piece.unwrap(),
-                    Piece::white(Pawn),
-                    "pos: {}, piece: {:?}",
-                    pos,
-                    piece
-                );
-            } else if pos == F7 {
-                assert_eq!(
-                    piece.unwrap(),
-                    Piece::black(King),
-                    "pos: {}, piece: {:?}",
-                    pos,
-                    piece
-                );
-            } else if pos == H3 {
-                assert_eq!(
-                    piece.unwrap(),
-                    Piece::white(King),
-                    "pos: {}, piece: {:?}",
-                    pos,
-                    piece
-                );
-            } else {
-                assert!(piece.is_none(), "pos: {}, piece: {:?}", pos, piece);
-            }
-        }
-        // assert_eq!(board, ChessBoard::new());
+    fn to_pretty_string_test() {
+        assert_eq!(
+            ChessBoard::default().to_pretty_string(),
+            "┌───┬───┬───┬───┬───┬───┬───┬───┐\n│ ♜ │ ♞ │ ♝ │ ♛ │ ♚ │ ♝ │ ♞ │ ♜ │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│ ♟︎ │ ♟︎ │ ♟︎ │ ♟︎ │ ♟︎ │ ♟︎ │ ♟︎ │ ♟︎ │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│   │   │   │   │   │   │   │   │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│   │   │   │   │   │   │   │   │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│   │   │   │   │   │   │   │   │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│   │   │   │   │   │   │   │   │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │ ♙ │\n├───┼───┼───┼───┼───┼───┼───┼───┤\n│ ♖ │ ♘ │ ♗ │ ♕ │ ♔ │ ♗ │ ♘ │ ♖ │\n└───┴───┴───┴───┴───┴───┴───┴───┘"
+        );
     }
 }

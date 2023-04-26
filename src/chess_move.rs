@@ -1,6 +1,6 @@
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
 use bitboard::*;
-use std::option::Option;
+use std::{option::Option, str::FromStr};
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
     (2, 1),
@@ -159,12 +159,9 @@ impl PromotionPiece {
 pub(crate) struct MoveManager {
     history: Vec<ChessBoard>,
     legal_moves: Vec<ChessMove>,
-    en_passant_possible_for_white: Option<Position>,
-    en_passant_possible_for_black: Option<Position>,
-    white_kingside_castle: bool,
-    white_queenside_castle: bool,
-    black_kingside_castle: bool,
-    black_queenside_castle: bool,
+    white_en_passant_target: Option<Position>,
+    black_en_passant_target: Option<Position>,
+    castling_rights: CastlingRights,
     half_moves: u32,
     full_moves: u32,
 }
@@ -173,24 +170,18 @@ impl MoveManager {
     pub(crate) fn new(
         history: Vec<ChessBoard>,
         legal_moves: Vec<ChessMove>,
-        en_passant_possible_for_white: Option<Position>,
-        en_passant_possible_for_black: Option<Position>,
-        white_kingside_castle: bool,
-        white_queenside_castle: bool,
-        black_kingside_castle: bool,
-        black_queenside_castle: bool,
+        white_en_passant_target: Option<Position>,
+        black_en_passant_target: Option<Position>,
+        castling_rights: CastlingRights,
         half_moves: u32,
         full_moves: u32,
     ) -> Self {
         Self {
             history,
             legal_moves,
-            en_passant_possible_for_white,
-            en_passant_possible_for_black,
-            white_kingside_castle,
-            white_queenside_castle,
-            black_kingside_castle,
-            black_queenside_castle,
+            white_en_passant_target,
+            black_en_passant_target,
+            castling_rights,
             half_moves,
             full_moves,
         }
@@ -264,35 +255,35 @@ impl MoveManager {
                 if from.file() == to.file() && from.manhattan_distance_to(to) == 2 {
                     match color {
                         Color::Black => {
-                            self.en_passant_possible_for_white =
+                            self.white_en_passant_target =
                                 Some(Position::new(from.file(), from.rank().down().unwrap()));
                         }
                         Color::White => {
-                            self.en_passant_possible_for_black =
+                            self.black_en_passant_target =
                                 Some(Position::new(from.file(), from.rank().up().unwrap()));
                         }
                     }
                 }
             }
             if from == E1 {
-                self.white_kingside_castle = false;
-                self.white_queenside_castle = false;
+                *self.castling_rights.white_kingside_mut() = false;
+                *self.castling_rights.white_queenside_mut() = false;
             }
             if from == A1 {
-                self.white_queenside_castle = false;
+                *self.castling_rights.white_queenside_mut() = false;
             }
             if from == A8 {
-                self.white_kingside_castle = false;
+                *self.castling_rights.white_kingside_mut() = false;
             }
             if from == E8 {
-                self.black_kingside_castle = false;
-                self.black_queenside_castle = false;
+                *self.castling_rights.black_kingside_mut() = false;
+                *self.castling_rights.black_queenside_mut() = false;
             }
             if from == A8 {
-                self.black_queenside_castle = false;
+                *self.castling_rights.black_queenside_mut() = false;
             }
             if from == H8 {
-                self.black_kingside_castle = false;
+                *self.castling_rights.black_kingside_mut() = false;
             }
         }
 
@@ -317,13 +308,9 @@ impl MoveManager {
         let mut actual_legal_moves = Vec::with_capacity(60);
         for &legal_move in &legal_moves {
             let mut board_clone = board.clone();
-            print!("testing move: {}, {:?}", player, legal_move);
             self.dry_run_move(&mut board_clone, player, legal_move);
             if !self.is_in_check(&board_clone, player) {
-                println!(" LEGAL");
                 actual_legal_moves.push(legal_move);
-            } else {
-                println!(" ILLEGAL");
             }
         }
 
@@ -339,21 +326,17 @@ impl MoveManager {
                     .unwrap();
                 let attackers = self.get_attackers(board, black_king, Color::White);
                 if attackers > 0 {
-                    println!("black king is in check, attackers: {}", attackers);
                     return true;
                 }
                 false
             }
             Color::White => {
-                dbg!(board.get_bitboard(Color::White, PieceType::King));
                 let white_king = board
                     .get_bitboard(Color::White, PieceType::King)
                     .first_position()
                     .unwrap();
-                dbg!(white_king);
                 let attackers = self.get_attackers(board, white_king, Color::Black);
                 if attackers > 0 {
-                    println!("white king is in check, attackers: {}", attackers);
                     return true;
                 }
                 false
@@ -510,7 +493,7 @@ impl MoveManager {
             }
 
             // en passant
-            if let t @ Some(en_passant_target) = self.en_passant_possible_for_white {
+            if let t @ Some(en_passant_target) = self.white_en_passant_target {
                 if from.rank() == Rank::Five && (from.up_left() == t || from.up_right() == t) {
                     legal_moves.push(ChessMove::EnPassant {
                         from,
@@ -559,7 +542,7 @@ impl MoveManager {
             }
 
             // en passant
-            if let t @ Some(en_passant_target) = self.en_passant_possible_for_black {
+            if let t @ Some(en_passant_target) = self.black_en_passant_target {
                 if from.rank() == Rank::Four && (from.down_left() == t || from.down_right() == t) {
                     legal_moves.push(ChessMove::EnPassant {
                         from,
@@ -605,15 +588,14 @@ impl MoveManager {
 
     fn evaluate_white_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
         use bitboard::*;
-        dbg!("evaluating white castle");
         let mut moves = Vec::with_capacity(2);
 
         // check short castle
-        if dbg!(self.white_kingside_castle)
-            && !dbg!(board.has_piece_at(F1))
-            && !dbg!(board.has_piece_at(G1))
-            && !dbg!(self.is_under_attack(board, F1, Color::Black))
-            && !dbg!(self.is_under_attack(board, G1, Color::Black))
+        if self.castling_rights.white_kingside()
+            && !board.has_piece_at(F1)
+            && !board.has_piece_at(G1)
+            && !self.is_under_attack(board, F1, Color::Black)
+            && !self.is_under_attack(board, G1, Color::Black)
         {
             moves.push(ChessMove::Castle {
                 rook_from: H1,
@@ -624,7 +606,7 @@ impl MoveManager {
         }
 
         // check long castle
-        if self.white_queenside_castle
+        if self.castling_rights.white_queenside()
             && !board.has_piece_at(D1)
             && !board.has_piece_at(C1)
             && !board.has_piece_at(B1)
@@ -646,11 +628,10 @@ impl MoveManager {
     fn evaluate_black_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
         use bitboard::*;
 
-        // has king moved?
         let mut moves = Vec::with_capacity(2);
 
         // check short castle
-        if self.black_kingside_castle
+        if self.castling_rights.black_kingside()
             && !board.has_piece_at(F8)
             && !board.has_piece_at(G8)
             && !self.is_under_attack(board, F8, Color::White)
@@ -665,7 +646,7 @@ impl MoveManager {
         }
 
         // check long castle
-        if self.black_queenside_castle
+        if self.castling_rights.black_queenside()
             && !board.has_piece_at(D8)
             && !board.has_piece_at(C8)
             && !board.has_piece_at(B8)
@@ -751,15 +732,129 @@ impl Default for MoveManager {
         Self {
             history: vec![],
             legal_moves: vec![],
-            en_passant_possible_for_white: None,
-            en_passant_possible_for_black: None,
-            white_kingside_castle: true,
-            white_queenside_castle: true,
-            black_kingside_castle: true,
-            black_queenside_castle: true,
+            white_en_passant_target: None,
+            black_en_passant_target: None,
+            castling_rights: CastlingRights::default(),
             half_moves: 1,
             full_moves: 0,
         }
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CastlingRights {
+    white_kingside: bool,
+    white_queenside: bool,
+    black_kingside: bool,
+    black_queenside: bool,
+}
+
+impl CastlingRights {
+    pub(crate) fn new(
+        white_kingside: bool,
+        white_queenside: bool,
+        black_kingside: bool,
+        black_queenside: bool,
+    ) -> Self {
+        Self {
+            white_kingside,
+            white_queenside,
+            black_kingside,
+            black_queenside,
+        }
+    }
+
+    pub(crate) fn white_kingside(&self) -> bool {
+        self.white_kingside
+    }
+
+    pub(crate) fn white_kingside_mut(&mut self) -> &mut bool {
+        &mut self.white_kingside
+    }
+
+    pub(crate) fn white_queenside(&self) -> bool {
+        self.white_queenside
+    }
+
+    pub(crate) fn white_queenside_mut(&mut self) -> &mut bool {
+        &mut self.white_queenside
+    }
+
+    pub(crate) fn black_kingside(&self) -> bool {
+        self.black_kingside
+    }
+
+    pub(crate) fn black_kingside_mut(&mut self) -> &mut bool {
+        &mut self.black_kingside
+    }
+
+    pub(crate) fn black_queenside(&self) -> bool {
+        self.black_queenside
+    }
+
+    pub(crate) fn black_queenside_mut(&mut self) -> &mut bool {
+        &mut self.black_queenside
+    }
+}
+
+impl Default for CastlingRights {
+    fn default() -> Self {
+        Self {
+            white_kingside: true,
+            white_queenside: true,
+            black_kingside: true,
+            black_queenside: true,
+        }
+    }
+}
+
+impl FromStr for CastlingRights {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (mut wk, mut wq, mut bk, mut bq) = (false, false, false, false);
+
+        if s != "-" {
+            if s.is_empty() {
+                return Err("invalid castling rights".to_string());
+            }
+            for c in s.chars() {
+                match c {
+                    'K' => {
+                        if !wk {
+                            wk = true;
+                        } else {
+                            return Err("invalid castling rights".to_string());
+                        }
+                    }
+                    'Q' => {
+                        if !wq {
+                            wq = true;
+                        } else {
+                            return Err("invalid castling rights".to_string());
+                        }
+                    }
+                    'k' => {
+                        if !bk {
+                            bk = true;
+                        } else {
+                            return Err("invalid castling rights".to_string());
+                        }
+                    }
+                    'q' => {
+                        if !bq {
+                            bq = true;
+                        } else {
+                            return Err("invalid castling rights".to_string());
+                        }
+                    }
+                    _ => return Err("invalid castling rights".to_string()),
+                }
+            }
+        } else {
+            (wk, wq, bk, bq) = (true, true, true, true)
+        }
+
+        Ok(CastlingRights::new(wk, wq, bk, bq))
     }
 }
 
@@ -771,7 +866,7 @@ mod tests {
 
     #[test]
     fn legal_moves() {
-        let board = ChessBoard::new();
+        let board = ChessBoard::default();
         let mut manager = MoveManager::default();
         manager.evaluate_legal_moves(&board, White);
 
@@ -814,7 +909,7 @@ mod tests {
 
     #[test]
     fn bishop_moves() {
-        let board = ChessBoard::new();
+        let board = ChessBoard::default();
         let manager = MoveManager::default();
 
         let bishop_moves_from_f4: Vec<Position> = manager
@@ -834,7 +929,7 @@ mod tests {
 
     #[test]
     fn rook_moves() {
-        let board = ChessBoard::new();
+        let board = ChessBoard::default();
         let manager = MoveManager::default();
 
         let rook_moves_from_c5: Vec<Position> = manager
@@ -850,7 +945,7 @@ mod tests {
 
     #[test]
     fn knight_moves() {
-        let board = ChessBoard::new();
+        let board = ChessBoard::default();
         let manager = MoveManager::default();
 
         let knight_moves_from_g4: Vec<Position> = manager
@@ -870,7 +965,7 @@ mod tests {
 
     #[test]
     fn queen_moves() {
-        let board = ChessBoard::new();
+        let board = ChessBoard::default();
         let manager = MoveManager::default();
 
         let queen_moves_from_a4: Vec<Position> = manager
@@ -888,7 +983,7 @@ mod tests {
     /// Remove all pawns from a chessboard and check legal moves for white
     fn moves_test_1() {
         use ChessMove::*;
-        let mut board = ChessBoard::new();
+        let mut board = ChessBoard::default();
         for pos in [
             A2, B2, C2, D2, E2, F2, G2, H2, A7, B7, C7, D7, E7, F7, G7, H7,
         ] {

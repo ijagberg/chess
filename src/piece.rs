@@ -56,6 +56,25 @@ impl Piece {
     pub fn king(color: Color) -> Self {
         Self::new(color, King)
     }
+
+    pub fn fen_char(&self) -> char {
+        use Color::*;
+
+        match (self.color(), self.kind()) {
+            (Black, Pawn) => 'p',
+            (Black, Knight) => 'n',
+            (Black, Bishop) => 'b',
+            (Black, Rook) => 'r',
+            (Black, Queen) => 'q',
+            (Black, King) => 'k',
+            (White, Pawn) => 'P',
+            (White, Knight) => 'N',
+            (White, Bishop) => 'B',
+            (White, Rook) => 'R',
+            (White, Queen) => 'Q',
+            (White, King) => 'K',
+        }
+    }
 }
 
 impl Display for Piece {
