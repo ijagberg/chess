@@ -26,21 +26,22 @@ pub const KING_OFFSETS: [(i32, i32); 8] = [
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum ChessMove {
-    Regular {
-        from: Position,
-        to: Position,
-    },
+    /// A regular chess move, moving a piece from one square to another.
+    Regular { from: Position, to: Position },
+    /// Holy hell.
     EnPassant {
         from: Position,
         to: Position,
         taken_original_index: Position,
         taken_index: Position,
     },
+    /// Pawn promotion, including which piece was promoted to.
     Promotion {
         from: Position,
         to: Position,
         piece: PromotionPiece,
     },
+    /// Castle
     Castle {
         rook_from: Position,
         rook_to: Position,
@@ -92,6 +93,7 @@ impl ChessMove {
         }
     }
 
+    /// Generate promotion moves.
     pub(crate) fn promotion_moves(from: Position, to: Position) -> Vec<ChessMove> {
         use PromotionPiece as PP;
         [PP::Bishop, PP::Knight, PP::Rook, PP::Queen]
@@ -152,32 +154,46 @@ impl PromotionPiece {
     }
 }
 
-#[derive(Debug)]
+/// Keeps track of legality of moves for a game.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MoveManager {
     history: Vec<ChessBoard>,
-    pub(crate) legal_moves: Vec<ChessMove>,
+    legal_moves: Vec<ChessMove>,
     en_passant_possible_for_white: Option<Position>,
     en_passant_possible_for_black: Option<Position>,
     white_kingside_castle: bool,
     white_queenside_castle: bool,
     black_kingside_castle: bool,
     black_queenside_castle: bool,
+    half_moves: u32,
+    full_moves: u32,
 }
 
 impl MoveManager {
-    pub(crate) fn new() -> Self {
-        let mut this = Self {
-            history: vec![],
-            legal_moves: vec![],
-            en_passant_possible_for_white: None,
-            en_passant_possible_for_black: None,
-            white_kingside_castle: true,
-            white_queenside_castle: true,
-            black_kingside_castle: true,
-            black_queenside_castle: true,
-        };
-
-        this
+    pub(crate) fn new(
+        history: Vec<ChessBoard>,
+        legal_moves: Vec<ChessMove>,
+        en_passant_possible_for_white: Option<Position>,
+        en_passant_possible_for_black: Option<Position>,
+        white_kingside_castle: bool,
+        white_queenside_castle: bool,
+        black_kingside_castle: bool,
+        black_queenside_castle: bool,
+        half_moves: u32,
+        full_moves: u32,
+    ) -> Self {
+        Self {
+            history,
+            legal_moves,
+            en_passant_possible_for_white,
+            en_passant_possible_for_black,
+            white_kingside_castle,
+            white_queenside_castle,
+            black_kingside_castle,
+            black_queenside_castle,
+            half_moves,
+            full_moves,
+        }
     }
 
     pub(crate) fn is_legal(&self, chess_move: ChessMove) -> bool {
@@ -730,6 +746,23 @@ impl MoveManager {
     }
 }
 
+impl Default for MoveManager {
+    fn default() -> Self {
+        Self {
+            history: vec![],
+            legal_moves: vec![],
+            en_passant_possible_for_white: None,
+            en_passant_possible_for_black: None,
+            white_kingside_castle: true,
+            white_queenside_castle: true,
+            black_kingside_castle: true,
+            black_queenside_castle: true,
+            half_moves: 1,
+            full_moves: 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -739,7 +772,7 @@ mod tests {
     #[test]
     fn legal_moves() {
         let board = ChessBoard::new();
-        let mut manager = MoveManager::new();
+        let mut manager = MoveManager::default();
         manager.evaluate_legal_moves(&board, White);
 
         dbg!(&manager);
@@ -782,7 +815,7 @@ mod tests {
     #[test]
     fn bishop_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new();
+        let manager = MoveManager::default();
 
         let bishop_moves_from_f4: Vec<Position> = manager
             .evaluate_legal_bishop_moves_from(&board, F4, White)
@@ -802,7 +835,7 @@ mod tests {
     #[test]
     fn rook_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new();
+        let manager = MoveManager::default();
 
         let rook_moves_from_c5: Vec<Position> = manager
             .evaluate_legal_rook_moves_from(&board, C5, Black)
@@ -818,7 +851,7 @@ mod tests {
     #[test]
     fn knight_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new();
+        let manager = MoveManager::default();
 
         let knight_moves_from_g4: Vec<Position> = manager
             .evaluate_legal_knight_moves_from(&board, G4, White)
@@ -838,7 +871,7 @@ mod tests {
     #[test]
     fn queen_moves() {
         let board = ChessBoard::new();
-        let manager = MoveManager::new();
+        let manager = MoveManager::default();
 
         let queen_moves_from_a4: Vec<Position> = manager
             .evaluate_legal_queen_moves_from(&board, A4, White)
@@ -864,7 +897,7 @@ mod tests {
 
         dbg!(board);
 
-        let mut move_manager = MoveManager::new();
+        let mut move_manager = MoveManager::default();
         move_manager.evaluate_legal_moves(&board, White);
         let moves = move_manager.get_legal_moves();
         let expected = [

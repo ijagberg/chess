@@ -25,6 +25,22 @@ impl Color {
             Color::White => Color::Black,
         }
     }
+
+    /// Returns `true` if the color is [`Black`].
+    ///
+    /// [`Black`]: Color::Black
+    #[must_use]
+    pub fn is_black(&self) -> bool {
+        matches!(self, Self::Black)
+    }
+
+    /// Returns `true` if the color is [`White`].
+    ///
+    /// [`White`]: Color::White
+    #[must_use]
+    pub fn is_white(&self) -> bool {
+        matches!(self, Self::White)
+    }
 }
 
 impl Display for Color {

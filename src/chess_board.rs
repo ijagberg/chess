@@ -63,6 +63,54 @@ impl ChessBoard {
             black_kings | black_queens | black_rooks | black_knights | black_bishops | black_pawns;
         let all_pieces = white_pieces | black_pieces;
 
+        Self::construct(
+            white_kings,
+            black_kings,
+            all_kings,
+            white_queens,
+            black_queens,
+            all_queens,
+            white_rooks,
+            black_rooks,
+            all_rooks,
+            white_knights,
+            black_knights,
+            all_knights,
+            white_bishops,
+            black_bishops,
+            all_bishops,
+            white_pawns,
+            black_pawns,
+            all_pawns,
+            white_pieces,
+            black_pieces,
+            all_pieces,
+        )
+    }
+
+    fn construct(
+        white_kings: Bitboard,
+        black_kings: Bitboard,
+        all_kings: Bitboard,
+        white_queens: Bitboard,
+        black_queens: Bitboard,
+        all_queens: Bitboard,
+        white_rooks: Bitboard,
+        black_rooks: Bitboard,
+        all_rooks: Bitboard,
+        white_knights: Bitboard,
+        black_knights: Bitboard,
+        all_knights: Bitboard,
+        white_bishops: Bitboard,
+        black_bishops: Bitboard,
+        all_bishops: Bitboard,
+        white_pawns: Bitboard,
+        black_pawns: Bitboard,
+        all_pawns: Bitboard,
+        white_pieces: Bitboard,
+        black_pieces: Bitboard,
+        all_pieces: Bitboard,
+    ) -> Self {
         Self {
             white_kings,
             black_kings,
@@ -379,7 +427,14 @@ impl ChessBoard {
                 let bb = Bitboard::with_one(pos);
                 if let Some(digit) = c.to_digit(10) {
                     // c empty squares starting at `current_file`
-                    current_file = current_file.add_offset(digit as i32 - 1).ok_or(())?;
+                    let digit = digit as i32;
+                    if digit > 8 {
+                        return Err(());
+                    } else if digit + i32::from(u8::from(current_file)) == 8 {
+                        continue;
+                    } else {
+                        current_file = current_file.add_offset(digit as i32).ok_or(())?;
+                    }
                 } else {
                     if current_file != File::H {
                         current_file = current_file.right().unwrap();
@@ -540,7 +595,50 @@ mod tests {
 
     #[test]
     fn from_fen_test() {
+        use PieceType::*;
+
         let board = ChessBoard::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
         assert_eq!(board, ChessBoard::new());
+
+        let board = ChessBoard::from_fen("8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8").unwrap();
+        for pos in INCREASING_A1_B1 {
+            let piece = board.get_piece(pos);
+            if [A4, B5, D6, E5, F4, H5].contains(&pos) {
+                assert_eq!(
+                    piece.unwrap(),
+                    Piece::black(Pawn),
+                    "pos: {}, piece: {:?}",
+                    pos,
+                    piece
+                );
+            } else if [A3, B4, D5, E4, F3, H4].contains(&pos) {
+                assert_eq!(
+                    piece.unwrap(),
+                    Piece::white(Pawn),
+                    "pos: {}, piece: {:?}",
+                    pos,
+                    piece
+                );
+            } else if pos == F7 {
+                assert_eq!(
+                    piece.unwrap(),
+                    Piece::black(King),
+                    "pos: {}, piece: {:?}",
+                    pos,
+                    piece
+                );
+            } else if pos == H3 {
+                assert_eq!(
+                    piece.unwrap(),
+                    Piece::white(King),
+                    "pos: {}, piece: {:?}",
+                    pos,
+                    piece
+                );
+            } else {
+                assert!(piece.is_none(), "pos: {}, piece: {:?}", pos, piece);
+            }
+        }
+        // assert_eq!(board, ChessBoard::new());
     }
 }

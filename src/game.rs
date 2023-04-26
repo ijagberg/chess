@@ -6,6 +6,7 @@ use crate::{
 use bitboard::{File, Position, Rank};
 use std::collections::HashSet;
 
+/// A game of chess.
 #[derive(Debug)]
 pub struct Game {
     current_player: Color,
@@ -14,11 +15,16 @@ pub struct Game {
 }
 
 impl Game {
+    /// Create a new chess game, with pieces on their standard starting positions.
     pub fn new() -> Self {
         let board = ChessBoard::new();
         let current_player = Color::White;
-        let mut move_manager = MoveManager::new();
+        let mut move_manager = MoveManager::default();
         move_manager.evaluate_legal_moves(&board, current_player);
+        Self::construct(current_player, move_manager, board)
+    }
+
+    fn construct(current_player: Color, move_manager: MoveManager, board: ChessBoard) -> Self {
         Self {
             current_player,
             move_manager,
@@ -26,18 +32,22 @@ impl Game {
         }
     }
 
+    /// Get a reference to the `ChessBoard` of the game.
     pub fn board(&self) -> &ChessBoard {
         &self.board
     }
 
+    /// Get the player whose turn it is.
     pub fn current_player(&self) -> Color {
         self.current_player
     }
 
+    /// Get a list of all possible moves for the current player.
     pub fn get_moves(&self) -> &Vec<ChessMove> {
         self.move_manager.get_legal_moves()
     }
 
+    /// Get a list of all possible moves for the current player from `from`.
     pub fn get_moves_from(&self, from: Position) -> Vec<ChessMove> {
         let moves = self.move_manager.get_legal_moves();
         let mut moves_from = Vec::new();
@@ -50,10 +60,12 @@ impl Game {
         moves_from
     }
 
+    /// Returns `true` if the game is over (if a checkmate or stalemate has been reached).
     pub fn is_over(&self) -> bool {
         self.move_manager.get_legal_moves().is_empty()
     }
 
+    /// Returns the result of the game, or `None` if the game is not over.
     pub fn game_result(&self) -> Option<GameOver> {
         if self.is_over() {
             if self
@@ -69,6 +81,12 @@ impl Game {
         }
     }
 
+    /// Make a move.
+    ///
+    /// # Returns
+    /// * `Ok` if the move was successful.
+    /// * `Err` if the game is over.
+    /// * `Err` if the move is not legal.
     pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), &'static str> {
         if self.is_over() {
             Err("game is over")
@@ -95,7 +113,7 @@ impl Game {
         }
 
         // first part is board setup
-        // TODO
+        let board = ChessBoard::from_fen(parts[0])?;
 
         // second part is current player
         let current_player = match parts[1] {
@@ -106,14 +124,14 @@ impl Game {
 
         // the third part contains castling rights
         let castling: HashSet<char> = parts[2].chars().collect();
-        let white_kingside = castling.contains(&'K');
-        let white_queenside = castling.contains(&'Q');
-        let black_kingside = castling.contains(&'k');
-        let black_queenside = castling.contains(&'q');
+        let white_kingside_castle = castling.contains(&'K');
+        let white_queenside_castle = castling.contains(&'Q');
+        let black_kingside_castle = castling.contains(&'k');
+        let black_queenside_castle = castling.contains(&'q');
 
         // the fourth part is en passant target square
-        let (black_en_passant, white_en_passant) = if parts[3] != "-" {
-            let position: Position = parts[3].parse().unwrap();
+        let (en_passant_possible_for_black, en_passant_possible_for_white) = if parts[3] != "-" {
+            let position: Position = parts[3].parse().map_err(|_| ())?;
             match position.rank() {
                 Rank::Three => ((Some(position), None)),
                 Rank::Six => (None, Some(position)),
@@ -124,12 +142,27 @@ impl Game {
         };
 
         // the fifth part contains the number of halfmoves since the last capture or pawn advancement (for 50-move rule)
-        // TODO
+        let half_moves = parts[4].parse().map_err(|_| ())?;
 
         // the sixth part contains the number of fullmoves, starting at 1
-        // TODO
+        let full_moves = parts[5].parse().map_err(|_| ())?;
 
-        todo!()
+        let mut move_manager = MoveManager::new(
+            vec![],
+            vec![],
+            en_passant_possible_for_white,
+            en_passant_possible_for_black,
+            white_kingside_castle,
+            white_queenside_castle,
+            black_kingside_castle,
+            black_queenside_castle,
+            half_moves,
+            full_moves,
+        );
+
+        move_manager.evaluate_legal_moves(&board, current_player);
+
+        Ok(Self::construct(current_player, move_manager, board))
     }
 }
 
@@ -216,7 +249,7 @@ mod tests {
     fn castle() {
         let mut game = setup_castle_game();
 
-        dbg!(&game.move_manager.legal_moves);
+        dbg!(&game.get_moves());
 
         game.make_move(ChessMove::Castle {
             rook_from: H1,
@@ -336,7 +369,7 @@ mod tests {
         game.make_move(regular(G5, F7)).unwrap();
         game.make_move(regular(E8, F7)).unwrap();
         game.make_move(regular(E4, G5)).unwrap();
-        dbg!(&game.move_manager.legal_moves);
+        dbg!(&game.get_moves());
         game.make_move(regular(F7, G8)).unwrap();
         game.make_move(regular(G5, E6)).unwrap();
         game.make_move(regular(D8, E8)).unwrap();
@@ -375,6 +408,38 @@ mod tests {
         }
         assert!(game.is_over());
         assert_eq!(game.game_result().unwrap(), GameOver::Draw);
+    }
+
+    #[test]
+    fn from_fen_test() {
+        use ChessMove::*;
+        let fen = "8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50";
+        let game = Game::from_fen(fen).unwrap();
+        assert!(game.current_player().is_black());
+        dbg!(game.board());
+        assert_eq!(
+            game.move_manager,
+            MoveManager::new(
+                vec![],
+                vec![
+                    Regular { from: F7, to: F6 },
+                    Regular { from: F7, to: G6 },
+                    Regular { from: F7, to: E7 },
+                    Regular { from: F7, to: G7 },
+                    Regular { from: F7, to: E8 },
+                    Regular { from: F7, to: F8 },
+                    Regular { from: F7, to: G8 },
+                ],
+                None,
+                None,
+                false,
+                false,
+                false,
+                false,
+                99,
+                50
+            )
+        );
     }
 
     /// Set up a game where en passant is possible
