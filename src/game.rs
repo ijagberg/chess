@@ -1,6 +1,6 @@
 use crate::{
     chess_board::ChessBoard,
-    chess_move::{ChessMove, MoveManager},
+    chess_move::{CastlingRights, ChessMove, MoveManager},
     fen::Fen,
     Color,
 };
@@ -25,8 +25,8 @@ impl Game {
     }
 
     /// Get a reference to the `ChessBoard` of the game.
-    pub fn board(&self) -> &ChessBoard {
-        &self.board
+    pub fn board(&self) -> ChessBoard {
+        self.board
     }
 
     /// Get the player whose turn it is.
@@ -37,6 +37,10 @@ impl Game {
     /// Get a list of all possible moves for the current player.
     pub fn get_moves(&self) -> &Vec<ChessMove> {
         self.move_manager.get_legal_moves()
+    }
+
+    pub(crate) fn castling_rights(&self) -> CastlingRights {
+        self.move_manager.castling_rights()
     }
 
     /// Get a list of all possible moves for the current player from `from`.
@@ -112,7 +116,16 @@ impl Game {
     }
 
     pub fn to_fen_string(&self) -> String {
-        todo!()
+        Fen::new(
+            self.board(),
+            self.current_player(),
+            self.castling_rights(),
+            self.move_manager.white_en_passant_target(),
+            self.move_manager.black_en_passant_target(),
+            self.move_manager.half_moves(),
+            self.move_manager.full_moves(),
+        )
+        .to_string()
     }
 
     pub fn to_pretty_string(&self) -> String {
@@ -400,6 +413,33 @@ mod tests {
                 99,
                 50
             )
+        );
+    }
+
+    #[test]
+    fn to_fen_string_test() {
+        let mut game = Game::default();
+        assert_eq!(
+            game.to_fen_string(),
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        );
+
+        game.make_move(regular(E2, E4)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+        );
+
+        game.make_move(regular(B8, C6)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2"
+        );
+
+        game.make_move(regular(E1, E2)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPPKPPP/RNBQ1BNR b kq - 2 2"
         );
     }
 

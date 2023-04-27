@@ -379,6 +379,37 @@ impl ChessBoard {
         buf.push_str("\n└───┴───┴───┴───┴───┴───┴───┴───┘");
         return buf;
     }
+
+    pub(crate) fn to_fen_string(&self) -> String {
+        let mut parts = vec![String::new(); 8];
+
+        for (r, rank) in Rank::Eight.down_all().enumerate() {
+            let mut file_i = 0;
+            while file_i < 8 {
+                let file = File::try_from(file_i).unwrap();
+                let mut pos = Position::new(file, rank);
+                if let Some(piece) = self.get_piece(pos) {
+                    parts[r].push(piece.fen_char());
+                    file_i += 1;
+                } else {
+                    let mut empty_squares = 0;
+                    while file_i < 8 {
+                        pos = Position::new(File::try_from(file_i).unwrap(), rank);
+                        if !self.has_piece_at(pos) {
+                            empty_squares += 1;
+                            file_i += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    debug_assert!(empty_squares <= 8);
+                    parts[r].push_str(&empty_squares.to_string());
+                }
+            }
+        }
+
+        parts.join("/")
+    }
 }
 
 impl Default for ChessBoard {

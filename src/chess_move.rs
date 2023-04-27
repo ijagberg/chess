@@ -191,6 +191,26 @@ impl MoveManager {
         self.legal_moves.contains(&chess_move)
     }
 
+    pub(crate) fn castling_rights(&self) -> CastlingRights {
+        self.castling_rights
+    }
+
+    pub(crate) fn white_en_passant_target(&self) -> Option<Position> {
+        self.white_en_passant_target
+    }
+
+    pub(crate) fn black_en_passant_target(&self) -> Option<Position> {
+        self.black_en_passant_target
+    }
+
+    pub(crate) fn half_moves(&self) -> u32 {
+        self.half_moves
+    }
+
+    pub(crate) fn full_moves(&self) -> u32 {
+        self.full_moves
+    }
+
     pub(crate) fn dry_run_move(
         &self,
         board: &mut ChessBoard,
@@ -246,12 +266,15 @@ impl MoveManager {
         player: Color,
         chess_move: ChessMove,
     ) -> Option<Piece> {
+        let mut moved_pawn = false;
         if let ChessMove::Regular { from, to } = chess_move {
             if let Some(Piece {
                 color,
                 kind: PieceType::Pawn,
             }) = board.get_piece(from)
             {
+                // if we move a pawn, we reset 50-move counter
+                moved_pawn = true;
                 if from.file() == to.file() && from.manhattan_distance_to(to) == 2 {
                     match color {
                         Color::Black => {
@@ -288,6 +311,28 @@ impl MoveManager {
         }
 
         let taken_piece = self.dry_run_move(board, player, chess_move);
+
+        if moved_pawn
+            || chess_move.is_en_passant()
+            || chess_move.is_promotion()
+            || taken_piece.is_some()
+        {
+            // en passant and promotion moves a pawn, which resets 50 move rule
+            // and so does taking a piece
+            self.half_moves = 0;
+        } else {
+            self.half_moves += 1;
+        }
+
+        match player {
+            Color::Black => {
+                self.full_moves += 1;
+                self.black_en_passant_target = None;
+            }
+            Color::White => {
+                self.white_en_passant_target = None;
+            }
+        }
 
         self.history.push(*board);
 
@@ -735,8 +780,8 @@ impl Default for MoveManager {
             white_en_passant_target: None,
             black_en_passant_target: None,
             castling_rights: CastlingRights::default(),
-            half_moves: 1,
-            full_moves: 0,
+            half_moves: 0,
+            full_moves: 1,
         }
     }
 }
@@ -793,6 +838,33 @@ impl CastlingRights {
 
     pub(crate) fn black_queenside_mut(&mut self) -> &mut bool {
         &mut self.black_queenside
+    }
+
+    pub(crate) fn as_fen_string(&self) -> String {
+        if (
+            self.white_kingside,
+            self.white_queenside,
+            self.black_kingside,
+            self.black_queenside,
+        ) == (false, false, false, false)
+        {
+            return "-".to_string();
+        } else {
+            let mut buf = String::with_capacity(4);
+            if self.white_kingside {
+                buf.push('K');
+            }
+            if self.white_queenside {
+                buf.push('Q');
+            }
+            if self.black_kingside {
+                buf.push('k');
+            }
+            if self.black_queenside {
+                buf.push('q');
+            }
+            buf
+        }
     }
 }
 

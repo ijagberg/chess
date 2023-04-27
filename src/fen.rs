@@ -13,7 +13,7 @@ pub(crate) struct Fen {
 }
 
 impl Fen {
-    fn new(
+    pub(crate) fn new(
         board: ChessBoard,
         current_player: Color,
         castling_rights: CastlingRights,
@@ -290,7 +290,22 @@ fn board_from_fen_part_0(part0: &str) -> Result<ChessBoard, String> {
 
 impl Display for Fen {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(
+            f,
+            "{}",
+            [
+                self.board().to_fen_string(),
+                self.current_player().fen_char().to_string(),
+                self.castling_rights().as_fen_string(),
+                self.white_en_passant_target()
+                    .or(self.black_en_passant_target())
+                    .map(|pos| pos.to_string())
+                    .unwrap_or("-".to_string()),
+                self.halfmoves().to_string(),
+                self.fullmoves().to_string(),
+            ]
+            .join(" ")
+        )
     }
 }
 
