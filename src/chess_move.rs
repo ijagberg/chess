@@ -1,6 +1,6 @@
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
 use bitboard::*;
-use std::{option::Option, str::FromStr};
+use std::{collections::HashSet, option::Option, str::FromStr};
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
     (2, 1),
@@ -24,7 +24,7 @@ pub const KING_OFFSETS: [(i32, i32); 8] = [
     (-1, 1),
 ];
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum ChessMove {
     /// A regular chess move, moving a piece from one square to another.
     Regular { from: Position, to: Position },
@@ -135,7 +135,7 @@ impl ChessMove {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PromotionPiece {
     Knight,
     Bishop,
@@ -157,8 +157,9 @@ impl PromotionPiece {
 /// Keeps track of legality of moves for a game.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MoveManager {
-    history: Vec<ChessBoard>,
-    legal_moves: Vec<ChessMove>,
+    board_history: Vec<ChessBoard>,
+    move_history: Vec<ChessMove>,
+    legal_moves: HashSet<ChessMove>,
     white_en_passant_target: Option<Position>,
     black_en_passant_target: Option<Position>,
     castling_rights: CastlingRights,
@@ -168,8 +169,9 @@ pub(crate) struct MoveManager {
 
 impl MoveManager {
     pub(crate) fn new(
-        history: Vec<ChessBoard>,
-        legal_moves: Vec<ChessMove>,
+        board_history: Vec<ChessBoard>,
+        move_history: Vec<ChessMove>,
+        legal_moves: HashSet<ChessMove>,
         white_en_passant_target: Option<Position>,
         black_en_passant_target: Option<Position>,
         castling_rights: CastlingRights,
@@ -177,7 +179,8 @@ impl MoveManager {
         full_moves: u32,
     ) -> Self {
         Self {
-            history,
+            board_history,
+            move_history,
             legal_moves,
             white_en_passant_target,
             black_en_passant_target,
@@ -273,7 +276,7 @@ impl MoveManager {
                 kind: PieceType::Pawn,
             }) = board.get_piece(from)
             {
-                // if we move a pawn, we reset 50-move counter
+                // if we move a pawn, we reset 50-move counter later in the function
                 moved_pawn = true;
                 if from.file() == to.file() && from.manhattan_distance_to(to) == 2 {
                     match color {
@@ -288,26 +291,7 @@ impl MoveManager {
                     }
                 }
             }
-            if from == E1 {
-                *self.castling_rights.white_kingside_mut() = false;
-                *self.castling_rights.white_queenside_mut() = false;
-            }
-            if from == A1 {
-                *self.castling_rights.white_queenside_mut() = false;
-            }
-            if from == A8 {
-                *self.castling_rights.white_kingside_mut() = false;
-            }
-            if from == E8 {
-                *self.castling_rights.black_kingside_mut() = false;
-                *self.castling_rights.black_queenside_mut() = false;
-            }
-            if from == A8 {
-                *self.castling_rights.black_queenside_mut() = false;
-            }
-            if from == H8 {
-                *self.castling_rights.black_kingside_mut() = false;
-            }
+            self.update_castling_rights(from);
         }
 
         let taken_piece = self.dry_run_move(board, player, chess_move);
@@ -334,13 +318,36 @@ impl MoveManager {
             }
         }
 
-        self.history.push(*board);
+        self.board_history.push(*board);
 
         taken_piece
     }
 
-    pub fn get_legal_moves(&self) -> &Vec<ChessMove> {
+    pub fn get_legal_moves(&self) -> &HashSet<ChessMove> {
         &self.legal_moves
+    }
+
+    fn update_castling_rights(&mut self, from: Position) {
+        if from == E1 {
+            *self.castling_rights.white_kingside_mut() = false;
+            *self.castling_rights.white_queenside_mut() = false;
+        }
+        if from == A1 {
+            *self.castling_rights.white_queenside_mut() = false;
+        }
+        if from == A8 {
+            *self.castling_rights.white_kingside_mut() = false;
+        }
+        if from == E8 {
+            *self.castling_rights.black_kingside_mut() = false;
+            *self.castling_rights.black_queenside_mut() = false;
+        }
+        if from == A8 {
+            *self.castling_rights.black_queenside_mut() = false;
+        }
+        if from == H8 {
+            *self.castling_rights.black_kingside_mut() = false;
+        }
     }
 
     pub(crate) fn evaluate_legal_moves(&mut self, board: &ChessBoard, player: Color) {
@@ -350,12 +357,12 @@ impl MoveManager {
             legal_moves.append(&mut legal_moves_from_pos);
         }
 
-        let mut actual_legal_moves = Vec::with_capacity(60);
+        let mut actual_legal_moves = HashSet::with_capacity(60);
         for &legal_move in &legal_moves {
             let mut board_clone = board.clone();
             self.dry_run_move(&mut board_clone, player, legal_move);
             if !self.is_in_check(&board_clone, player) {
-                actual_legal_moves.push(legal_move);
+                actual_legal_moves.insert(legal_move);
             }
         }
 
@@ -775,8 +782,9 @@ impl MoveManager {
 impl Default for MoveManager {
     fn default() -> Self {
         Self {
-            history: vec![],
-            legal_moves: vec![],
+            board_history: vec![],
+            move_history: vec![],
+            legal_moves: HashSet::with_capacity(30),
             white_en_passant_target: None,
             black_en_passant_target: None,
             castling_rights: CastlingRights::default(),
@@ -944,7 +952,7 @@ mod tests {
 
         dbg!(&manager);
 
-        let legal_moves: Vec<_> = manager
+        let legal_moves: HashSet<_> = manager
             .get_legal_moves()
             .iter()
             .map(|m| (m.from(), m.to()))
@@ -976,6 +984,8 @@ mod tests {
                 (H2, H3),
                 (H2, H4)
             ]
+            .into_iter()
+            .collect()
         );
     }
 
@@ -1067,7 +1077,7 @@ mod tests {
         let mut move_manager = MoveManager::default();
         move_manager.evaluate_legal_moves(&board, White);
         let moves = move_manager.get_legal_moves();
-        let expected = [
+        let expected: HashSet<_> = [
             // queenside rook can move up to and including A8 (which would take blacks queenside rook)
             Regular { from: A1, to: A2 },
             Regular { from: A1, to: A3 },
@@ -1127,11 +1137,12 @@ mod tests {
             Regular { from: H1, to: H6 },
             Regular { from: H1, to: H7 },
             Regular { from: H1, to: H8 },
-        ];
+        ]
+        .iter()
+        .copied()
+        .collect();
 
         assert_eq!(moves.len(), expected.len());
-        for (actual, expected) in moves.iter().zip(expected.iter()) {
-            assert_eq!(actual, expected);
-        }
+        assert_eq!(moves, &expected);
     }
 }

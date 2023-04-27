@@ -35,7 +35,7 @@ impl Game {
     }
 
     /// Get a list of all possible moves for the current player.
-    pub fn get_moves(&self) -> &Vec<ChessMove> {
+    pub fn get_moves(&self) -> &HashSet<ChessMove> {
         self.move_manager.get_legal_moves()
     }
 
@@ -105,6 +105,7 @@ impl Game {
         let mut mm = MoveManager::new(
             vec![],
             vec![],
+            HashSet::new(),
             fen.white_en_passant_target(),
             fen.black_en_passant_target(),
             fen.castling_rights(),
@@ -398,7 +399,8 @@ mod tests {
             game.move_manager,
             MoveManager::new(
                 vec![],
-                vec![
+                vec![],
+                [
                     Regular { from: F7, to: F6 },
                     Regular { from: F7, to: G6 },
                     Regular { from: F7, to: E7 },
@@ -406,7 +408,10 @@ mod tests {
                     Regular { from: F7, to: E8 },
                     Regular { from: F7, to: F8 },
                     Regular { from: F7, to: G8 },
-                ],
+                ]
+                .iter()
+                .copied()
+                .collect(),
                 None,
                 None,
                 CastlingRights::default(),
@@ -440,6 +445,24 @@ mod tests {
         assert_eq!(
             game.to_fen_string(),
             "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPPKPPP/RNBQ1BNR b kq - 2 2"
+        );
+
+        game.make_move(regular(D7, D5)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "r1bqkbnr/ppp1pppp/2n5/3p4/4P3/8/PPPPKPPP/RNBQ1BNR w kq d6 0 3"
+        );
+
+        game.make_move(regular(E4, D5)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "r1bqkbnr/ppp1pppp/2n5/3P4/8/8/PPPPKPPP/RNBQ1BNR b kq - 0 3"
+        );
+
+        game.make_move(regular(A8, B8)).unwrap();
+        assert_eq!(
+            game.to_fen_string(),
+            "1rbqkbnr/ppp1pppp/2n5/3P4/8/8/PPPPKPPP/RNBQ1BNR w k - 1 4"
         );
     }
 
