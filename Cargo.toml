@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 bitboard = { path = "../bitboard" }
+regex = "1.8.1"

@@ -11,6 +11,7 @@ mod chess_move;
 mod game;
 mod piece;
 mod fen;
+mod pgn;
 pub mod prelude;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

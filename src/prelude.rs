@@ -4,3 +4,4 @@ pub use crate::{
     piece::{Piece, PieceType},
     Color,
 };
+pub use bitboard::*;
