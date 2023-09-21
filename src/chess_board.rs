@@ -1,5 +1,5 @@
 use crate::{fen::Fen, piece::PieceType, Color, Piece};
-use bitboard::*;
+use bitboard64::prelude::*;
 use std::{
     convert::TryFrom,
     fmt::Debug,
@@ -114,6 +114,14 @@ impl ChessBoard {
 
     pub fn full_occupancy(&self) -> Bitboard {
         self.all_pieces
+    }
+
+    pub fn white_occupancy(&self) -> Bitboard {
+        self.get_occupancy_for_color(Color::White)
+    }
+
+    pub fn black_occupancy(&self) -> Bitboard {
+        self.get_occupancy_for_color(Color::Black)
     }
 
     pub fn get_occupancy_for_color(&self, color: Color) -> Bitboard {
@@ -342,19 +350,20 @@ impl ChessBoard {
     }
 
     pub fn knight_moves(&self, color: Color, pos: Position) -> Bitboard {
-        Bitboard::knight_targets(pos)
-            & match color {
-                Color::Black => !self.black_pieces,
-                Color::White => !self.white_pieces,
-            }
+        Bitboard::knight_targets(
+            pos,
+            match color {
+                Color::Black => self.black_pieces,
+                Color::White => self.white_pieces,
+            },
+        )
     }
 
     pub fn king_moves(&self, color: Color, pos: Position) -> Bitboard {
-        Bitboard::king_targets(pos)
-            & match color {
-                Color::Black => !self.black_pieces,
-                Color::White => !self.white_pieces,
-            }
+        match color {
+            Color::Black => Bitboard::black_king_targets(pos, self.black_pieces),
+            Color::White => Bitboard::white_king_targets(pos, self.white_pieces),
+        }
     }
 
     pub fn to_pretty_string(&self) -> String {
@@ -362,9 +371,9 @@ impl ChessBoard {
         use PieceType::*;
 
         let mut buf = String::from("┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
-        for rank in Rank::Eight.down_all() {
+        for rank in Rank::Eight.walk_down() {
             buf.push_str("│");
-            for file in File::A.right_all() {
+            for file in File::A.walk_right() {
                 let pos = Position::new(file, rank);
                 let s = match self.get_piece(pos) {
                     Some(piece) => piece.to_string(),
@@ -383,7 +392,7 @@ impl ChessBoard {
     pub(crate) fn to_fen_string(&self) -> String {
         let mut parts = vec![String::new(); 8];
 
-        for (r, rank) in Rank::Eight.down_all().enumerate() {
+        for (r, rank) in Rank::Eight.walk_down().enumerate() {
             let mut file_i = 0;
             while file_i < 8 {
                 let file = File::try_from(file_i).unwrap();

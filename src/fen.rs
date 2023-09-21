@@ -1,6 +1,6 @@
 use crate::{chess_board::ChessBoard, chess_move::CastlingRights, Color};
-use bitboard::{Bitboard, File, Position, Rank};
-use std::{fmt::Display, str::FromStr};
+use bitboard64::prelude::*;
+use std::{convert::TryFrom, fmt::Display, str::FromStr};
 
 pub(crate) struct Fen {
     board: ChessBoard,
@@ -152,7 +152,7 @@ fn board_from_fen_part_0(part0: &str) -> Result<ChessBoard, String> {
         return Err("invalid board".to_string());
     }
 
-    for (row, rank) in rows.iter().zip(Rank::Eight.down_all()) {
+    for (row, rank) in rows.iter().zip(Rank::Eight.walk_down()) {
         // check that the sum of the content is 8
         if row
             .chars()
@@ -179,7 +179,7 @@ fn board_from_fen_part_0(part0: &str) -> Result<ChessBoard, String> {
                 if digit + i32::from(u8::from(current_file)) == 8 {
                     continue;
                 } else {
-                    current_file = current_file.add_offset(digit as i32).unwrap();
+                    current_file = add_file_offset(current_file, digit as i32).unwrap();
                 }
             } else {
                 if current_file != File::H {
@@ -309,11 +309,16 @@ impl Display for Fen {
     }
 }
 
+pub(crate) fn add_file_offset(file: File, offset: i32) -> Option<File> {
+    let v = (u8::from(file)) as i32 + offset;
+    File::try_from(u8::try_from(v).ok()?).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{piece::PieceType, Piece};
-    use bitboard::*;
+    use bitboard64::prelude::*;
 
     #[test]
     fn fen_test() {

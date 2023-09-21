@@ -1,5 +1,5 @@
 use crate::{chess_board::ChessBoard, game::Game, piece::PieceType, Color, Piece};
-use bitboard::*;
+use bitboard64::prelude::*;
 use std::{collections::HashSet, option::Option, str::FromStr};
 
 pub const KNIGHT_OFFSETS: [(i32, i32); 8] = [
@@ -353,8 +353,8 @@ impl MoveManager {
     pub(crate) fn evaluate_legal_moves(&mut self, board: &ChessBoard, player: Color) {
         let mut legal_moves = Vec::with_capacity(60);
         for pos in board.get_occupancy_for_color(player).positions() {
-            let mut legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
-            legal_moves.append(&mut legal_moves_from_pos);
+            let legal_moves_from_pos = self.evaluate_legal_moves_from(board, pos, player);
+            legal_moves.extend(legal_moves_from_pos);
         }
 
         let mut actual_legal_moves = HashSet::with_capacity(60);
@@ -425,21 +425,34 @@ impl MoveManager {
                         & board.get_bitboard(Black, Pawn)
                 }
                 (Black, Knight) => {
-                    Bitboard::knight_targets(target) & board.get_bitboard(Black, Knight)
+                    Bitboard::knight_targets(target, Bitboard::empty())
+                        & board.get_bitboard(Black, Knight)
                 }
                 (Black, Bishop) => {
-                    Bitboard::bishop_targets(target, board.full_occupancy())
-                        & board.get_bitboard(Black, Bishop)
+                    Bitboard::white_bishop_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(Black, Bishop)
                 }
                 (Black, Rook) => {
-                    Bitboard::rook_targets(target, board.full_occupancy())
-                        & board.get_bitboard(Black, Rook)
+                    Bitboard::white_rook_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(Black, Rook)
                 }
                 (Black, Queen) => {
-                    Bitboard::queen_targets(target, board.full_occupancy())
-                        & board.get_bitboard(Black, Queen)
+                    Bitboard::white_queen_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(Black, Queen)
                 }
-                (Black, King) => Bitboard::king_targets(target) & board.get_bitboard(Black, King),
+                (Black, King) => {
+                    Bitboard::white_king_targets(target, board.white_occupancy())
+                        & board.get_bitboard(Black, King)
+                }
                 (White, Pawn) => {
                     (Position::down_left(&target)
                         .map(|p| Bitboard::with_one(p))
@@ -450,21 +463,34 @@ impl MoveManager {
                         & board.get_bitboard(White, Pawn)
                 }
                 (White, Knight) => {
-                    Bitboard::knight_targets(target) & board.get_bitboard(White, Knight)
+                    Bitboard::knight_targets(target, Bitboard::empty())
+                        & board.get_bitboard(White, Knight)
                 }
                 (White, Bishop) => {
-                    Bitboard::bishop_targets(target, board.full_occupancy())
-                        & board.get_bitboard(White, Bishop)
+                    Bitboard::black_bishop_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(White, Bishop)
                 }
                 (White, Rook) => {
-                    Bitboard::rook_targets(target, board.full_occupancy())
-                        & board.get_bitboard(White, Rook)
+                    Bitboard::black_rook_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(White, Rook)
                 }
                 (White, Queen) => {
-                    Bitboard::queen_targets(target, board.full_occupancy())
-                        & board.get_bitboard(White, Queen)
+                    Bitboard::black_queen_targets(
+                        target,
+                        board.white_occupancy(),
+                        board.black_occupancy(),
+                    ) & board.get_bitboard(White, Queen)
                 }
-                (White, King) => Bitboard::king_targets(target) & board.get_bitboard(White, King),
+                (White, King) => {
+                    Bitboard::black_king_targets(target, board.black_occupancy())
+                        & board.get_bitboard(White, King)
+                }
             }
         }
         attacker_bb
@@ -475,7 +501,7 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
+    ) -> HashSet<ChessMove> {
         if let Some(piece) = board.get_piece(from) {
             if piece.color() == player {
                 return match piece.kind() {
@@ -490,7 +516,7 @@ impl MoveManager {
         }
 
         println!("no piece on {from}");
-        Vec::new()
+        HashSet::new()
     }
 
     fn evaluate_legal_pawn_moves_from(
@@ -498,11 +524,11 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
+    ) -> HashSet<ChessMove> {
         if from.rank() == Rank::One || from.rank() == Rank::Eight {
             // TODO: mark this as an error somehow?
             // There should never be a pawn on the first or eighth ranks.
-            return Vec::new();
+            return HashSet::new();
         }
         match player {
             Color::Black => self.evaluate_legal_black_pawn_moves_from(board, from),
@@ -514,45 +540,45 @@ impl MoveManager {
         &self,
         board: &ChessBoard,
         from: Position,
-    ) -> Vec<ChessMove> {
-        let mut legal_moves = Vec::with_capacity(10);
+    ) -> HashSet<ChessMove> {
+        let mut legal_moves = HashSet::with_capacity(10);
         if from.rank() == Rank::Seven {
             // from here it's only possible to promote
 
             // check position in front
             let up = from.up().unwrap();
             if !board.has_piece_at(up) {
-                legal_moves.append(&mut ChessMove::promotion_moves(from, up));
+                legal_moves.extend(ChessMove::promotion_moves(from, up));
             }
             if let Some(up_left) = from.up_left() {
                 if board.has_piece_of_color_at(Color::Black, up_left) {
-                    legal_moves.append(&mut ChessMove::promotion_moves(from, up_left));
+                    legal_moves.extend(ChessMove::promotion_moves(from, up_left));
                 }
             }
             if let Some(up_right) = from.up_right() {
                 if board.has_piece_of_color_at(Color::Black, up_right) {
-                    legal_moves.append(&mut ChessMove::promotion_moves(from, up_right));
+                    legal_moves.extend(ChessMove::promotion_moves(from, up_right));
                 }
             }
         } else {
             let targets = Bitboard::white_pawn_targets(
                 from,
-                board.get_occupancy_for_color(Color::Black),
-                board.get_occupancy_for_color(Color::White),
-            ) & !board.get_occupancy_for_color(Color::White);
+                board.white_occupancy(),
+                board.black_occupancy(),
+            );
             for to in targets.positions() {
-                legal_moves.push(ChessMove::Regular { from, to });
+                legal_moves.insert(ChessMove::Regular { from, to });
             }
 
             // en passant
             if let t @ Some(en_passant_target) = self.white_en_passant_target {
                 if from.rank() == Rank::Five && (from.up_left() == t || from.up_right() == t) {
-                    legal_moves.push(ChessMove::EnPassant {
+                    legal_moves.insert(ChessMove::EnPassant {
                         from,
                         to: en_passant_target,
                         taken_original_index: Position::new(en_passant_target.file(), Rank::Seven),
                         taken_index: Position::new(en_passant_target.file(), Rank::Five),
-                    })
+                    });
                 }
             }
         }
@@ -563,45 +589,42 @@ impl MoveManager {
         &self,
         board: &ChessBoard,
         from: Position,
-    ) -> Vec<ChessMove> {
-        let mut legal_moves = Vec::with_capacity(10);
+    ) -> HashSet<ChessMove> {
+        let mut legal_moves = HashSet::with_capacity(10);
         if from.rank() == Rank::Two {
             // from here it's only possible to promote
 
             // check position in front
             let down = from.down().unwrap();
             if !board.has_piece_at(down) {
-                legal_moves.append(&mut ChessMove::promotion_moves(from, down));
+                legal_moves.extend(ChessMove::promotion_moves(from, down));
             }
             if let Some(down_left) = from.down_left() {
                 if board.has_piece_of_color_at(Color::White, down_left) {
-                    legal_moves.append(&mut ChessMove::promotion_moves(from, down_left));
+                    legal_moves.extend(ChessMove::promotion_moves(from, down_left));
                 }
             }
             if let Some(down_right) = from.down_right() {
                 if board.has_piece_of_color_at(Color::White, down_right) {
-                    legal_moves.append(&mut ChessMove::promotion_moves(from, down_right));
+                    legal_moves.extend(ChessMove::promotion_moves(from, down_right));
                 }
             }
         } else {
-            let targets = Bitboard::black_pawn_targets(
-                from,
-                board.get_occupancy_for_color(Color::White),
-                board.get_occupancy_for_color(Color::Black),
-            ) & !board.get_occupancy_for_color(Color::Black);
+            let targets =
+                Bitboard::black_pawn_targets(from, board.white_occupancy(), board.black_occupancy());
             for to in targets.positions() {
-                legal_moves.push(ChessMove::Regular { from, to });
+                legal_moves.insert(ChessMove::Regular { from, to });
             }
 
             // en passant
             if let t @ Some(en_passant_target) = self.black_en_passant_target {
                 if from.rank() == Rank::Four && (from.down_left() == t || from.down_right() == t) {
-                    legal_moves.push(ChessMove::EnPassant {
+                    legal_moves.insert(ChessMove::EnPassant {
                         from,
                         to: en_passant_target,
                         taken_original_index: Position::new(en_passant_target.file(), Rank::Two),
                         taken_index: Position::new(en_passant_target.file(), Rank::Four),
-                    })
+                    });
                 }
             }
         }
@@ -613,10 +636,13 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
-        use bitboard::{E1, E8};
-        let targets = Bitboard::king_targets(from) & !board.get_occupancy_for_color(player);
-        let mut legal_moves: Vec<ChessMove> = targets
+    ) -> HashSet<ChessMove> {
+        use bitboard64::prelude::*;
+        let targets = match player {
+            Color::Black => Bitboard::black_king_targets(from, board.black_occupancy()),
+            Color::White => Bitboard::white_king_targets(from, board.white_occupancy()),
+        };
+        let mut legal_moves: HashSet<ChessMove> = targets
             .positions()
             .into_iter()
             .map(|to| ChessMove::Regular { from, to })
@@ -625,12 +651,12 @@ impl MoveManager {
         match (player, from) {
             (Color::Black, E8) => {
                 if let Some(mut castle_moves) = self.evaluate_black_castle(board) {
-                    legal_moves.append(&mut castle_moves);
+                    legal_moves.extend(castle_moves);
                 }
             }
             (Color::White, E1) => {
                 if let Some(mut castle_moves) = self.evaluate_white_castle(board) {
-                    legal_moves.append(&mut castle_moves);
+                    legal_moves.extend(castle_moves);
                 }
             }
             _ => {}
@@ -639,7 +665,7 @@ impl MoveManager {
     }
 
     fn evaluate_white_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
-        use bitboard::*;
+        use bitboard64::prelude::*;
         let mut moves = Vec::with_capacity(2);
 
         // check short castle
@@ -678,7 +704,7 @@ impl MoveManager {
     }
 
     fn evaluate_black_castle(&self, board: &ChessBoard) -> Option<Vec<ChessMove>> {
-        use bitboard::*;
+        use bitboard64::prelude::*;
 
         let mut moves = Vec::with_capacity(2);
 
@@ -722,12 +748,18 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
-        let targets = Bitboard::knight_targets(from) & !board.get_occupancy_for_color(player);
+    ) -> HashSet<ChessMove> {
+        let targets = Bitboard::knight_targets(
+            from,
+            match player {
+                Color::Black => board.black_occupancy(),
+                Color::White => board.white_occupancy(),
+            },
+        ) & !board.get_occupancy_for_color(player);
 
-        let mut legal_moves = Vec::with_capacity(8);
+        let mut legal_moves = HashSet::with_capacity(8);
         for to in targets.positions() {
-            legal_moves.push(ChessMove::Regular { from, to });
+            legal_moves.insert(ChessMove::Regular { from, to });
         }
         legal_moves
     }
@@ -737,12 +769,22 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
-        let targets = Bitboard::bishop_targets(from, board.full_occupancy())
-            & !board.get_occupancy_for_color(player);
-        let mut legal_moves = Vec::with_capacity(16);
+    ) -> HashSet<ChessMove> {
+        let targets = match player {
+            Color::Black => Bitboard::black_bishop_targets(
+                from,
+                board.white_occupancy(),
+                board.black_occupancy(),
+            ),
+            Color::White => Bitboard::white_bishop_targets(
+                from,
+                board.white_occupancy(),
+                board.black_occupancy(),
+            ),
+        };
+        let mut legal_moves = HashSet::with_capacity(16);
         for to in targets.positions() {
-            legal_moves.push(ChessMove::Regular { from, to })
+            legal_moves.insert(ChessMove::Regular { from, to });
         }
         legal_moves
     }
@@ -752,13 +794,19 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
-        let targets = Bitboard::rook_targets(from, board.full_occupancy())
-            & !board.get_occupancy_for_color(player);
+    ) -> HashSet<ChessMove> {
+        let targets = match player {
+            Color::Black => {
+                Bitboard::black_rook_targets(from, board.white_occupancy(), board.black_occupancy())
+            }
+            Color::White => {
+                Bitboard::white_rook_targets(from, board.white_occupancy(), board.black_occupancy())
+            }
+        };
 
-        let mut legal_moves = Vec::with_capacity(16);
+        let mut legal_moves = HashSet::with_capacity(16);
         for to in targets.positions() {
-            legal_moves.push(ChessMove::Regular { from, to })
+            legal_moves.insert(ChessMove::Regular { from, to });
         }
         legal_moves
     }
@@ -768,12 +816,22 @@ impl MoveManager {
         board: &ChessBoard,
         from: Position,
         player: Color,
-    ) -> Vec<ChessMove> {
-        let targets = Bitboard::queen_targets(from, board.full_occupancy())
-            & !board.get_occupancy_for_color(player);
-        let mut legal_moves = Vec::with_capacity(16);
+    ) -> HashSet<ChessMove> {
+        let targets = match player {
+            Color::Black => Bitboard::black_queen_targets(
+                from,
+                board.white_occupancy(),
+                board.black_occupancy(),
+            ),
+            Color::White => Bitboard::white_queen_targets(
+                from,
+                board.white_occupancy(),
+                board.black_occupancy(),
+            ),
+        };
+        let mut legal_moves = HashSet::with_capacity(16);
         for to in targets.positions() {
-            legal_moves.push(ChessMove::Regular { from, to })
+            legal_moves.insert(ChessMove::Regular { from, to });
         }
         legal_moves
     }
@@ -941,7 +999,7 @@ impl FromStr for CastlingRights {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitboard::*;
+    use bitboard64::prelude::*;
     use Color::*;
 
     #[test]
@@ -994,19 +1052,22 @@ mod tests {
         let board = ChessBoard::default();
         let manager = MoveManager::default();
 
-        let bishop_moves_from_f4: Vec<Position> = manager
+        let bishop_moves_from_f4: HashSet<Position> = manager
             .evaluate_legal_bishop_moves_from(&board, F4, White)
             .iter()
             .map(|m| m.to())
             .collect();
-        assert_eq!(bishop_moves_from_f4, vec![E3, G3, E5, G5, D6, H6, C7]);
+        assert_eq!(
+            bishop_moves_from_f4,
+            [E3, G3, E5, G5, D6, H6, C7].iter().copied().collect()
+        );
 
-        let bishop_moves_from_c1: Vec<Position> = manager
+        let bishop_moves_from_c1: HashSet<Position> = manager
             .evaluate_legal_bishop_moves_from(&board, C1, White)
             .iter()
             .map(|m| m.to())
             .collect();
-        assert_eq!(bishop_moves_from_c1, vec![]);
+        assert_eq!(bishop_moves_from_c1, HashSet::new());
     }
 
     #[test]
@@ -1014,14 +1075,17 @@ mod tests {
         let board = ChessBoard::default();
         let manager = MoveManager::default();
 
-        let rook_moves_from_c5: Vec<Position> = manager
+        let rook_moves_from_c5: HashSet<Position> = manager
             .evaluate_legal_rook_moves_from(&board, C5, Black)
             .iter()
             .map(|m| m.to())
             .collect();
         assert_eq!(
             rook_moves_from_c5,
-            vec![C2, C3, C4, A5, B5, D5, E5, F5, G5, H5, C6]
+            [C2, C3, C4, A5, B5, D5, E5, F5, G5, H5, C6]
+                .iter()
+                .copied()
+                .collect()
         );
     }
 
@@ -1030,19 +1094,25 @@ mod tests {
         let board = ChessBoard::default();
         let manager = MoveManager::default();
 
-        let knight_moves_from_g4: Vec<Position> = manager
+        let knight_moves_from_g4: HashSet<Position> = manager
             .evaluate_legal_knight_moves_from(&board, G4, White)
             .iter()
             .map(|m| m.to())
             .collect();
-        assert_eq!(knight_moves_from_g4, vec![E3, E5, F6, H6]);
+        assert_eq!(
+            knight_moves_from_g4,
+            [E3, E5, F6, H6].iter().copied().collect()
+        );
 
-        let knight_moves_from_d4: Vec<Position> = manager
+        let knight_moves_from_d4: HashSet<Position> = manager
             .evaluate_legal_knight_moves_from(&board, D4, White)
             .iter()
             .map(|m| m.to())
             .collect();
-        assert_eq!(knight_moves_from_d4, vec![B3, F3, B5, F5, C6, E6]);
+        assert_eq!(
+            knight_moves_from_d4,
+            [B3, F3, B5, F5, C6, E6].iter().copied().collect()
+        );
     }
 
     #[test]
@@ -1050,14 +1120,17 @@ mod tests {
         let board = ChessBoard::default();
         let manager = MoveManager::default();
 
-        let queen_moves_from_a4: Vec<Position> = manager
+        let queen_moves_from_a4: HashSet<Position> = manager
             .evaluate_legal_queen_moves_from(&board, A4, White)
             .iter()
             .map(|m| m.to())
             .collect();
         assert_eq!(
             queen_moves_from_a4,
-            vec![A3, B3, B4, C4, D4, E4, F4, G4, H4, A5, B5, A6, C6, A7, D7]
+            [A3, B3, B4, C4, D4, E4, F4, G4, H4, A5, B5, A6, C6, A7, D7]
+                .iter()
+                .copied()
+                .collect()
         );
     }
 

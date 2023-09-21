@@ -3,12 +3,23 @@
 version = 3
 
 [[package]]
-name = "bitboard"
+name = "bitboard64"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cac8456489913660a342f37b6f7992d52038bab0e7f1f500db747a1d51e167d"
+dependencies = [
+ "chesspos",
+]
 
 [[package]]
 name = "chess"
 version = "0.1.0"
 dependencies = [
- "bitboard",
+ "bitboard64",
 ]
+
+[[package]]
+name = "chesspos"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "173c5871fc9285d7964a9547831a6c4189f661a24590776173a1f545e5b01fb6"

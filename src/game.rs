@@ -4,7 +4,7 @@ use crate::{
     fen::Fen,
     Color,
 };
-use bitboard::{File, Position, Rank};
+use bitboard64::prelude::*;
 use std::{collections::HashSet, str::FromStr};
 
 /// A game of chess.
@@ -165,7 +165,7 @@ mod tests {
     use crate::chess_move::CastlingRights;
     use crate::prelude::*;
     use crate::{chess_move::PromotionPiece, Color::*};
-    use bitboard::*;
+    use bitboard64::prelude::*;
     use std::collections::HashSet;
 
     #[test]
