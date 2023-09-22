@@ -332,7 +332,11 @@ impl ChessBoard {
         None
     }
 
-    pub fn get_piece(&self, pos: Position) -> Option<Piece> {
+    pub fn get_piece<T>(&self, pos: T) -> Option<Piece>
+    where
+        T: Into<Position>,
+    {
+        let pos: Position = pos.into();
         let bit_index = Bitboard::with_one(pos);
 
         let color = self.get_color_of_pos(pos)?;

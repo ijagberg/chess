@@ -5,4 +5,4 @@ authors = ["Isak Jägberg <ijagberg@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-bitboard64 = "0.1.0"
+bitboard64 = { git = "https://github.com/ijagberg/bitboard", branch = "develop" }

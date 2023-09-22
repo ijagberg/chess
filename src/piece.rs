@@ -78,6 +78,9 @@ impl Piece {
 }
 
 impl Display for Piece {
+    /// Create a string representation of `self`.
+    ///
+    /// "♟︎" "♞" "♝" "♜" "♛" "♚" "♙" "♘" "♗" "♖" "♕" "♔"
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let output = match (&self.color(), &self.kind()) {
             (Color::Black, PieceType::Pawn) => "♟︎",

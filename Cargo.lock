@@ -5,8 +5,7 @@ version = 3
 [[package]]
 name = "bitboard64"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cac8456489913660a342f37b6f7992d52038bab0e7f1f500db747a1d51e167d"
+source = "git+https://github.com/ijagberg/bitboard?branch=develop#c076e1fd9843bb8b3e4017b98127fff10f1004ac"
 dependencies = [
  "chesspos",
 ]
@@ -20,6 +19,5 @@ dependencies = [
 
 [[package]]
 name = "chesspos"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173c5871fc9285d7964a9547831a6c4189f661a24590776173a1f545e5b01fb6"
+version = "0.1.1"
+source = "git+https://github.com/ijagberg/chesspos?branch=develop#9070a468230ab25aab77b8c1671f5495846ce354"
